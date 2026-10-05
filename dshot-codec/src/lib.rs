@@ -1,5 +1,7 @@
 //! Hardware-independent encoding for bidirectional DShot.
 //!
+//! - [`decode_frame`] turns a value from the PIO RX FIFO into a [`Frame`] from the FC.
+//! - [`encode_frame`] is the reverse of [`decode_frame`], as done by the FC.
 //! - [`frame_ok`] checks the inverted CRC of a 16-bit frame received from the FC.
 //! - [`encode_period`] packs an electrical revolution period into the 12-bit `e12` format.
 //! - [`encode_reply`] turns `e12` into the line levels of the telemetry reply,
@@ -47,6 +49,66 @@ fn crc4_inverted(v: u16) -> u16 {
 /// `frame` is the logical frame, i.e. already inverted back from the line levels.
 pub fn frame_ok(frame: u16) -> bool {
     crc4_inverted(frame >> 4) == frame & 0x0F
+}
+
+/// Throttle values below this are special commands (0 = motor stop, 1..=47 = beep, version
+/// request etc.); from this value up they are real throttle.
+pub const THROTTLE_MIN: u16 = 48;
+
+/// Largest throttle value (11 bits).
+pub const THROTTLE_MAX: u16 = 0x7FF;
+
+/// A frame from the FC: 11-bit throttle, telemetry request bit T and a 4-bit CRC.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Frame {
+    /// 0..=2047; below [`THROTTLE_MIN`] it is a special command.
+    pub throttle: u16,
+    /// The T bit: the FC asks for extended telemetry.
+    pub telemetry: bool,
+}
+
+impl Frame {
+    /// True for special commands (throttle 0..=47), false for real throttle.
+    pub fn is_command(&self) -> bool {
+        self.throttle < THROTTLE_MIN
+    }
+}
+
+/// Reasons [`decode_frame`] rejects a frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameError {
+    /// The CRC does not match.
+    BadCrc,
+}
+
+/// Decodes a value from the PIO RX FIFO into a [`Frame`].
+///
+/// The PIO samples the line in the middle of each bit, and in bidirectional mode
+/// the line is low there for a 1 and high for a 0. So `raw` holds the 16 frame bits
+/// inverted, in the lower 16 bits (autopush at 16). They are inverted back here.
+pub fn decode_frame(raw: u32) -> Result<Frame, FrameError> {
+    let frame = !raw as u16;
+    if !frame_ok(frame) {
+        return Err(FrameError::BadCrc);
+    }
+    Ok(Frame {
+        throttle: frame >> 5,
+        telemetry: (frame >> 4) & 1 == 1,
+    })
+}
+
+/// Encodes a frame as the FC sends it: throttle (11 bits), T, inverted CRC (4 bits).
+///
+/// Returns the logical 16-bit frame, MSB first on the line. Throttle above
+/// [`THROTTLE_MAX`] is cut to 11 bits.
+pub fn encode_frame(frame: Frame) -> u16 {
+    debug_assert!(
+        frame.throttle <= THROTTLE_MAX,
+        "throttle {} > 2047",
+        frame.throttle
+    );
+    let v = ((frame.throttle & THROTTLE_MAX) << 1) | frame.telemetry as u16;
+    (v << 4) | crc4_inverted(v)
 }
 
 /// Packs an electrical revolution period (µs) into `e12`: 3 bits of exponent `e`
@@ -159,6 +221,76 @@ mod tests {
                 assert_eq!(frame_ok((v << 4) | crc), (v << 4) | crc == good);
             }
         }
+    }
+
+    #[test]
+    fn frame_example_from_plan() {
+        // docs/bidirectional-dshot-plan.md, steps 2 and 4: throttle 1000, T = 0
+        // → frame 0x7D05, read by the PIO as 0x82FA.
+        let f = Frame {
+            throttle: 1000,
+            telemetry: false,
+        };
+        assert_eq!(encode_frame(f), 0x7D05);
+        assert_eq!(decode_frame(0x82FA), Ok(f));
+    }
+
+    #[test]
+    fn frame_telemetry_bit() {
+        // Throttle 0, T = 1: v = 0b0000_0000_0001, CRC = !(1) & 0xF = 0xE.
+        let f = Frame {
+            throttle: 0,
+            telemetry: true,
+        };
+        assert_eq!(encode_frame(f), 0x001E);
+        assert_eq!(decode_frame(!0x001Eu32), Ok(f));
+    }
+
+    #[test]
+    fn frame_roundtrip_all_values() {
+        for throttle in 0..=THROTTLE_MAX {
+            for telemetry in [false, true] {
+                let f = Frame {
+                    throttle,
+                    telemetry,
+                };
+                let frame = encode_frame(f);
+                assert!(frame_ok(frame));
+                // The PIO delivers the line levels: inverted bits in the lower 16 bits.
+                let raw = !frame as u32;
+                assert_eq!(decode_frame(raw), Ok(f), "frame {frame:#06x}");
+            }
+        }
+    }
+
+    #[test]
+    fn frame_single_bit_error_is_detected() {
+        // Each data bit lands in exactly one nibble of the XOR, so flipping any single
+        // bit of the frame (data or CRC) always breaks the CRC.
+        for throttle in 0..=THROTTLE_MAX {
+            for telemetry in [false, true] {
+                let frame = encode_frame(Frame {
+                    throttle,
+                    telemetry,
+                });
+                for bit in 0..16 {
+                    let raw = !(frame ^ (1 << bit)) as u32;
+                    assert_eq!(decode_frame(raw), Err(FrameError::BadCrc));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn frame_command_range() {
+        let f = |throttle| Frame {
+            throttle,
+            telemetry: false,
+        };
+        assert!(f(0).is_command());
+        assert!(f(47).is_command());
+        assert!(!f(48).is_command());
+        assert!(!f(2047).is_command());
     }
 
     #[test]
