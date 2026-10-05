@@ -271,10 +271,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dshot-codec"
+version = "0.1.0"
+
+[[package]]
 name = "dshot-reader-embassy"
 version = "0.1.0"
 dependencies = [
  "cortex-m-rt",
+ "dshot-codec",
  "embassy-executor",
  "embassy-futures",
  "embassy-rp",

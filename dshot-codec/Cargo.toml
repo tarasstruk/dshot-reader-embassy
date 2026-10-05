@@ -1,0 +1,8 @@
+[package]
+name = "dshot-codec"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+description = "Hardware-independent encoding for bidirectional DShot: frame CRC, eRPM period and GCR/NRZI reply"
+
+[dependencies]

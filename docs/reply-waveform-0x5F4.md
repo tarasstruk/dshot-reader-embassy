@@ -275,7 +275,7 @@ fn encode_period(period_us: u32) -> u16 {
 }
 
 /// Кроки 3–6: e12 → слово для TX FIFO.
-fn reply_word(e12: u16) -> u32 {
+fn encode_reply(e12: u16) -> u32 {
     let v = e12 & 0x0FFF;
     let crc = !(v ^ (v >> 4) ^ (v >> 8)) & 0x0F; // крок 3
     let word = (v << 4) | crc;
@@ -298,6 +298,6 @@ fn reply_word(e12: u16) -> u32 {
 #[test]
 fn reply_matches_waveform() {
     assert_eq!(encode_period(2000), 0x5F4);
-    assert_eq!(reply_word(0x5F4), 0x66A9_6800);
+    assert_eq!(encode_reply(0x5F4), 0x66A9_6800);
 }
 ```

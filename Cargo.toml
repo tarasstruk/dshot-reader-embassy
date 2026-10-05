@@ -4,8 +4,12 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.83"
 
+[workspace]
+members = ["dshot-codec"]
+
 [dependencies]
 cortex-m-rt = "0.7.5"
+dshot-codec = { path = "dshot-codec" }
 embassy-executor = { version = "0.7.0", features = ["arch-cortex-m", "executor-thread"] }
 embassy-futures = "0.1.1"
 embassy-rp = { version = "0.4.0", features = ["time-driver", "critical-section-impl", "rp2040"] }
