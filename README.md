@@ -30,7 +30,8 @@ Then run `cargo r`.
 Connect these pins:
 
 - RP2040 signal ground;
-- RP2040 GPIO0 to the DShot signal line (it is both read and driven: the reply goes back to the FC).
+- RP2040 GPIO0 to the DShot signal line (it is both read and driven: the reply goes back to the FC);
+- RP2040 GPIO3 can be watched as debug output.
 
 GPIO0 has the internal pull-up enabled; the line idles high.
 
@@ -66,5 +67,7 @@ Watch GPIO0 with a logic analyzer: after each frame from the FC there should be 
 and a 21-bit reply of 2.667 µs per bit (≈ 56 µs). For 30 000 eRPM the reply levels are
 `0 11001101010100101101` (see `docs/reply-waveform-0x5F4.md`).
 
-The GPIO3 debug output used in stage A is gone: the PIO SET group now drives GPIO0.
-It can come back via side-set (step 10 of `docs/bidirectional-dshot-plan.md`).
+Debug output on GPIO3 (PIO side-set):
+
+- a ~170 ns pulse around each sampled bit of a frame (about 1.67 µs after the falling edge of the bit);
+- high for the whole time the RP2040 drives GPIO0, i.e. while the reply is being sent (≈ 56 µs).

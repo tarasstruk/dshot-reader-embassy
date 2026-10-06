@@ -72,6 +72,7 @@ fn setup_pio_task_sm0<'d>(
     pio: &mut Common<'d, PIO0>,
     sm: &mut StateMachine<'d, PIO0, 0>,
     dshot_pin: impl PioPin,
+    debug_pin: impl PioPin,
 ) {
     // Receive: the line idles high, every bit starts with a falling edge,
     // and is low for 75 % of the bit for a 1 and for 37.5 % for a 0.
@@ -82,41 +83,50 @@ fn setup_pio_task_sm0<'d>(
     // Reply: ~30 µs after the frame, drive the line and send the 21 levels from the TX FIFO,
     // 32 ticks (2.667 µs) each, then release the line.
     // See docs/rp2040-pin-switch-dshot.md.
+    //
+    // Debug pin (side-set): a 2-tick pulse around each bit sample, and high for the whole
+    // time the PIO drives the line. Side-set takes 1 bit of the delay field, so delays
+    // are at most [15]; longer ones are split with `nop` keeping the same tick counts.
     let prg = pio_asm!(
+        ".side_set 1",
         ".wrap_target",
         "idle:",
-        "  set y, 31",
+        "  set y, 31           side 0",
         "idle_loop:",
-        "  jmp pin still_high", // line high: keep counting
-        "  jmp idle",           // line low: start over
+        "  jmp pin still_high  side 0", // line high: keep counting
+        "  jmp idle            side 0", // line low: start over
         "still_high:",
-        "  jmp y-- idle_loop", // 32 × 2 ticks ≈ 5.3 µs of silence: between frames
-        "  set x, 15",
+        "  jmp y-- idle_loop   side 0", // 32 × 2 ticks ≈ 5.3 µs of silence: between frames
+        "  set x, 15           side 0",
         "bit:",
-        "  wait 0 pin 0 [19]", // falling edge, then wait to the middle of the bit
-        "  in pins, 1",        // 20 ticks after the edge
-        "  wait 1 pin 0",      // wait for the line to rise again
-        "  jmp x-- bit", // 16 bits; autopush hands the frame to the RX FIFO; X ends as 0xFFFFFFFF
-        "  set y, 22",
+        "  wait 0 pin 0 [15]   side 0", // falling edge, then wait to the middle of the bit:
+        "  nop [2]             side 0", // 16 + 3 ...
+        "  nop                 side 1", // ... + 1 = 20 ticks; debug pulse starts
+        "  in pins, 1          side 1", // 20 ticks after the edge
+        "  wait 1 pin 0        side 0", // wait for the line to rise again
+        "  jmp x-- bit         side 0", // 16 bits; autopush hands the frame to the RX FIFO; X ends as 0xFFFFFFFF
+        "  set y, 22           side 0",
         "delay:",
-        "  jmp y-- delay [15]", // 23 × 16 = 368 ticks ≈ 30.7 µs
-        "  pull noblock",       // reply from the TX FIFO, or X (all ones: line stays high) if empty
-        "  set pins, 1",        // level first ...
-        "  set pindirs, 1",     // ... then drive: no glitch before the start bit
-        "  set y, 20",
+        "  jmp y-- delay [15]  side 0", // 23 × 16 = 368 ticks ≈ 30.7 µs
+        "  pull noblock        side 0", // reply from the TX FIFO, or X (all ones: line stays high) if empty
+        "  set pins, 1         side 0", // level first ...
+        "  set pindirs, 1      side 1", // ... then drive: no glitch before the start bit
+        "  set y, 20           side 1",
         "tx:",
-        "  out pins, 1 [30]", // 21 levels, 31 + 1 = 32 ticks each
-        "  jmp y-- tx",
-        "  set pins, 1",    // pull the line up actively ...
-        "  set pindirs, 0", // ... then release it to the pull-up
+        "  out pins, 1 [15]    side 1", // 21 levels, 16 ...
+        "  nop [14]            side 1", // ... + 15 ...
+        "  jmp y-- tx          side 1", // ... + 1 = 32 ticks each
+        "  set pins, 1         side 1", // pull the line up actively ...
+        "  set pindirs, 0      side 0", // ... then release it to the pull-up
         ".wrap"
     );
 
-    let mut cfg = Config::default();
-    cfg.use_program(&pio.load_program(&prg.program), &[]);
-
     let mut dshot_pin = pio.make_pio_pin(dshot_pin);
     dshot_pin.set_pull(Pull::Up); // the line idles high
+    let d_pin = pio.make_pio_pin(debug_pin);
+
+    let mut cfg = Config::default();
+    cfg.use_program(&pio.load_program(&prg.program), &[&d_pin]);
 
     // One pin in all four groups: the program both listens and talks on it.
     cfg.set_in_pins(&[&dshot_pin]); // `wait`, `in`
@@ -138,6 +148,7 @@ fn setup_pio_task_sm0<'d>(
 
     sm.set_config(&cfg);
     sm.set_pin_dirs(Direction::In, &[&dshot_pin]); // start as input
+    sm.set_pin_dirs(Direction::Out, &[&d_pin]);
     sm.set_enable(true);
 }
 
@@ -225,7 +236,7 @@ async fn main(_spawner: Spawner) {
         ..
     } = Pio::new(p.PIO0, Irqs);
 
-    setup_pio_task_sm0(&mut common, &mut sm0, p.PIN_0);
+    setup_pio_task_sm0(&mut common, &mut sm0, p.PIN_0, p.PIN_3);
 
     // Join all 3 futures
     join3(usb.run(), usb_future, pio_task_sm0(sm0)).await;
