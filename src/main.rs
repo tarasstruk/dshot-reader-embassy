@@ -9,7 +9,7 @@ use panic_halt as _;
 
 use core::cell::Cell;
 use core::fmt::Write as _;
-use dshot_codec::{decode_frame, Frame, FrameError};
+use dshot_codec::{decode_frame, encode_period, encode_reply, Frame, FrameError, E12_STOPPED};
 use embassy_executor::Spawner;
 use embassy_futures::join::join3;
 use embassy_rp::clocks::clk_sys_freq;
@@ -32,6 +32,9 @@ use fixed::types::extra::U8;
 /// the command bit (3.333 µs = 40 ticks) and the reply bit (2.667 µs = 32 ticks).
 const PIO_CLOCK_HZ: u32 = 12_000_000;
 
+/// The fixed telemetry value sent back in stage B.
+const REPLY_ERPM: u32 = 30_000;
+
 /// How often the latest frame and counters are sent over USB.
 const REPORT_PERIOD_MS: u64 = 500;
 
@@ -47,6 +50,8 @@ struct Stats {
     frames: u32,
     /// Frames rejected because of a bad CRC.
     bad_crc: u32,
+    /// Replies not queued because the TX FIFO was full.
+    tx_full: u32,
 }
 
 static STATS: Mutex<ThreadModeRawMutex, Cell<Stats>> = Mutex::new(Cell::new(Stats {
@@ -54,6 +59,7 @@ static STATS: Mutex<ThreadModeRawMutex, Cell<Stats>> = Mutex::new(Cell::new(Stat
     last: None,
     frames: 0,
     bad_crc: 0,
+    tx_full: 0,
 }));
 
 bind_interrupts!(struct Irqs {
@@ -61,18 +67,21 @@ bind_interrupts!(struct Irqs {
     PIO0_IRQ_0 => PioInterruptHandler<PIO0>;
 });
 
-// Setup PIO SM0: receive inverted (bidirectional) DShot300 frames.
+// Setup PIO SM0: receive inverted (bidirectional) DShot300 frames and reply with telemetry.
 fn setup_pio_task_sm0<'d>(
     pio: &mut Common<'d, PIO0>,
     sm: &mut StateMachine<'d, PIO0, 0>,
     dshot_pin: impl PioPin,
-    debug_pin: impl PioPin,
 ) {
-    // Bidirectional DShot: the line idles high, every bit starts with a falling edge,
+    // Receive: the line idles high, every bit starts with a falling edge,
     // and is low for 75 % of the bit for a 1 and for 37.5 % for a 0.
     // At 12 MHz a bit is 40 ticks, so sampling ~20 ticks after the edge reads
     // low for a 1 and high for a 0: the ISR gets the bits inverted.
-    // The debug pin pulses high around each sample point.
+    // See docs/rx-bit-timing.pdf.
+    //
+    // Reply: ~30 µs after the frame, drive the line and send the 21 levels from the TX FIFO,
+    // 32 ticks (2.667 µs) each, then release the line.
+    // See docs/rp2040-pin-switch-dshot.md.
     let prg = pio_asm!(
         ".wrap_target",
         "idle:",
@@ -84,12 +93,22 @@ fn setup_pio_task_sm0<'d>(
         "  jmp y-- idle_loop", // 32 × 2 ticks ≈ 5.3 µs of silence: between frames
         "  set x, 15",
         "bit:",
-        "  wait 0 pin 0 [18]", // falling edge, then wait to the middle of the bit
-        "  set pins, 1",       // debug: sample point
+        "  wait 0 pin 0 [19]", // falling edge, then wait to the middle of the bit
         "  in pins, 1",        // 20 ticks after the edge
-        "  set pins, 0",
-        "  wait 1 pin 0", // wait for the line to rise again
-        "  jmp x-- bit",  // 16 bits; autopush hands the frame to the RX FIFO
+        "  wait 1 pin 0",      // wait for the line to rise again
+        "  jmp x-- bit", // 16 bits; autopush hands the frame to the RX FIFO; X ends as 0xFFFFFFFF
+        "  set y, 22",
+        "delay:",
+        "  jmp y-- delay [15]", // 23 × 16 = 368 ticks ≈ 30.7 µs
+        "  pull noblock",       // reply from the TX FIFO, or X (all ones: line stays high) if empty
+        "  set pins, 1",        // level first ...
+        "  set pindirs, 1",     // ... then drive: no glitch before the start bit
+        "  set y, 20",
+        "tx:",
+        "  out pins, 1 [30]", // 21 levels, 31 + 1 = 32 ticks each
+        "  jmp y-- tx",
+        "  set pins, 1",    // pull the line up actively ...
+        "  set pindirs, 0", // ... then release it to the pull-up
         ".wrap"
     );
 
@@ -98,29 +117,42 @@ fn setup_pio_task_sm0<'d>(
 
     let mut dshot_pin = pio.make_pio_pin(dshot_pin);
     dshot_pin.set_pull(Pull::Up); // the line idles high
-    let d_pin = pio.make_pio_pin(debug_pin);
 
-    cfg.set_in_pins(&[&dshot_pin]); // for `wait` and `in`
-    cfg.set_jmp_pin(&dshot_pin); // for `jmp pin`
-    cfg.set_set_pins(&[&d_pin]);
+    // One pin in all four groups: the program both listens and talks on it.
+    cfg.set_in_pins(&[&dshot_pin]); // `wait`, `in`
+    cfg.set_jmp_pin(&dshot_pin); // `jmp pin`
+    cfg.set_out_pins(&[&dshot_pin]); // `out pins`: reply levels
+    cfg.set_set_pins(&[&dshot_pin]); // `set pins`, `set pindirs`: direction switch
     cfg.shift_in = ShiftConfig {
         auto_fill: true,
         direction: ShiftDirection::Left,
         threshold: 16,
     };
+    cfg.shift_out = ShiftConfig {
+        auto_fill: false,                // only `pull noblock` takes data from the TX FIFO
+        direction: ShiftDirection::Left, // `out pins, 1` takes bit 31 first
+        threshold: 32,
+    };
     cfg.clock_divider =
         fixed::FixedU32::<U8>::from_num(clk_sys_freq() as f32 / PIO_CLOCK_HZ as f32);
 
     sm.set_config(&cfg);
-    sm.set_pin_dirs(Direction::In, &[&dshot_pin]);
-    sm.set_pin_dirs(Direction::Out, &[&d_pin]);
+    sm.set_pin_dirs(Direction::In, &[&dshot_pin]); // start as input
     sm.set_enable(true);
 }
 
 async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
+    // Stage B: always the same reply, 30 000 eRPM.
+    let reply = encode_reply(encode_period(60_000_000 / REPLY_ERPM));
+
+    // The reply has to be in the TX FIFO before the frame arrives: the PIO takes it
+    // ~30 µs after the frame, too soon to wait for this task. So the FIFO is kept
+    // one reply ahead, as real ESCs do with the last measured value.
+    sm.tx().push(encode_reply(E12_STOPPED)); // before the first frame: "motor stopped"
     loop {
         let raw = sm.rx().wait_pull().await;
         let result = decode_frame(raw);
+        let queued = sm.tx().try_push(reply); // for the next frame
         STATS.lock(|cell| {
             let mut s = cell.get();
             s.last_raw = Some(raw);
@@ -128,6 +160,9 @@ async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
             s.frames = s.frames.wrapping_add(1);
             if result.is_err() {
                 s.bad_crc = s.bad_crc.wrapping_add(1);
+            }
+            if !queued {
+                s.tx_full = s.tx_full.wrapping_add(1);
             }
             cell.set(s);
         });
@@ -190,7 +225,7 @@ async fn main(_spawner: Spawner) {
         ..
     } = Pio::new(p.PIO0, Irqs);
 
-    setup_pio_task_sm0(&mut common, &mut sm0, p.PIN_0, p.PIN_3);
+    setup_pio_task_sm0(&mut common, &mut sm0, p.PIN_0);
 
     // Join all 3 futures
     join3(usb.run(), usb_future, pio_task_sm0(sm0)).await;
@@ -207,19 +242,16 @@ impl From<EndpointError> for Disconnected {
     }
 }
 
-/// One text line, short enough for a single USB packet.
-///
-/// Kept below 64 bytes: a full-size packet would need a zero-length packet after it
-/// for the host to deliver the line right away.
+/// One text line for USB.
 struct Line {
-    buf: [u8; 63],
+    buf: [u8; 96],
     len: usize,
 }
 
 impl Line {
     fn new() -> Self {
         Line {
-            buf: [0; 63],
+            buf: [0; 96],
             len: 0,
         }
     }
@@ -242,10 +274,10 @@ impl core::fmt::Write for Line {
 }
 
 /// Formats a snapshot of [`Stats`], e.g.
-/// `7D05 thr=1000 T=0 cmd=0 n=12345 bad=0` or `7D04 BAD_CRC n=12346 bad=1`.
+/// `7D05 thr=1000 T=0 cmd=0 n=12345 bad=0 txf=0` or `7D04 BAD_CRC n=12346 bad=1 txf=0`.
 fn format_stats(s: &Stats) -> Line {
     let mut line = Line::new();
-    // The longest line is 53 bytes, so these writes cannot run out of space.
+    // The longest line is 68 bytes, so these writes cannot run out of space.
     let _ = match (s.last_raw, s.last) {
         (Some(raw), Some(Ok(f))) => write!(
             line,
@@ -258,9 +290,18 @@ fn format_stats(s: &Stats) -> Line {
         (Some(raw), Some(Err(FrameError::BadCrc))) => write!(line, "{:04X} BAD_CRC ", !raw as u16),
         _ => write!(line, "no frames "),
     };
-    let _ = write!(line, "n={} bad={}\r\n", s.frames, s.bad_crc);
+    let _ = write!(
+        line,
+        "n={} bad={} txf={}\r\n",
+        s.frames, s.bad_crc, s.tx_full
+    );
     line
 }
+
+/// Largest chunk sent in one USB packet. Kept below the 64-byte packet size:
+/// a full-size packet would need a zero-length packet after it
+/// for the host to deliver the line right away.
+const USB_CHUNK: usize = 63;
 
 /// Write the latest frame and counters to USB as text.
 async fn usb_write<'d, T: Instance + 'd>(
@@ -269,6 +310,8 @@ async fn usb_write<'d, T: Instance + 'd>(
     loop {
         Timer::after_millis(REPORT_PERIOD_MS).await;
         let stats = STATS.lock(|cell| cell.get());
-        usb_tx.write_packet(format_stats(&stats).as_bytes()).await?;
+        for chunk in format_stats(&stats).as_bytes().chunks(USB_CHUNK) {
+            usb_tx.write_packet(chunk).await?;
+        }
     }
 }

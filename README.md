@@ -9,7 +9,8 @@ This package uses  [embassy-rp](https://crates.io/crates/embassy-rp) dependency 
 and provides a "npn-blocking" alternative to [dshot-reader-test](https://github.com/tarasstruk/dshot-reader-test).
 
 It is being moved to bidirectional DShot 300 (see `docs/action-plan.md`). Currently it receives
-inverted bidirectional frames (the line idles high) and does not reply yet.
+inverted bidirectional frames (the line idles high) and ~30 µs after each frame replies on the same
+wire with a fixed telemetry value of 30 000 eRPM (stage B).
 
 ### Hardware
 
@@ -29,19 +30,21 @@ Then run `cargo r`.
 Connect these pins:
 
 - RP2040 signal ground;
-- RP2040 GPIO0 to the source of DShot signals;
-- RP2040 GPIO3 can be watched as debug output.
+- RP2040 GPIO0 to the DShot signal line (it is both read and driven: the reply goes back to the FC).
+
+GPIO0 has the internal pull-up enabled; the line idles high.
 
 The received frames are decoded with `dshot-codec` and reported as text over the USB connection
 using a CDC+ACM profile, twice a second:
 
 ```
-7D05 thr=1000 T=0 cmd=0 n=12345 bad=0
+7D05 thr=1000 T=0 cmd=0 n=12345 bad=0 txf=0
 ```
 
 - `7D05` — the latest frame;
 - `thr` — throttle, `T` — telemetry request bit, `cmd` — 1 for special commands (throttle 0–47);
-- `n` — all frames received, `bad` — frames with a bad CRC (shown as `7D04 BAD_CRC ...`).
+- `n` — all frames received, `bad` — frames with a bad CRC (shown as `7D04 BAD_CRC ...`);
+- `txf` — replies that did not fit into the PIO TX FIFO (should stay 0).
 
 The lines can be seen in terminal, for example:
 
@@ -59,5 +62,9 @@ cargo test-codec
 
 ### Debugging
 
-Debug-signal on the pin GPIO3 pulses high at the moment each bit of a DShot frame is sampled
-(about 1.67 µs after the falling edge of the bit).
+Watch GPIO0 with a logic analyzer: after each frame from the FC there should be a pause of ~30 µs
+and a 21-bit reply of 2.667 µs per bit (≈ 56 µs). For 30 000 eRPM the reply levels are
+`0 11001101010100101101` (see `docs/reply-waveform-0x5F4.md`).
+
+The GPIO3 debug output used in stage A is gone: the PIO SET group now drives GPIO0.
+It can come back via side-set (step 10 of `docs/bidirectional-dshot-plan.md`).
