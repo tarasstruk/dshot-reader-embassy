@@ -22,7 +22,7 @@ use embassy_rp::pio::{
 use embassy_rp::usb::{Driver, Instance, InterruptHandler as UsbInterruptHandler};
 use embassy_rp::{bind_interrupts, pio::InterruptHandler as PioInterruptHandler};
 use embassy_sync::blocking_mutex::{raw::ThreadModeRawMutex, Mutex};
-use embassy_time::Timer;
+use embassy_time::{Instant, Timer};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, Sender, State};
 use embassy_usb::driver::EndpointError;
 use embassy_usb::{Builder, Config as UsbConfig};
@@ -38,6 +38,11 @@ const REPLY_ERPM: u32 = 30_000;
 /// How often the latest frame and counters are sent over USB.
 const REPORT_PERIOD_MS: u64 = 500;
 
+/// A wake-up of the PIO task later than this after the previous one counts as late.
+/// Frames come every 250 µs at 4 kHz, and the RX FIFO holds 4 of them,
+/// so after ~1 ms the PIO starts dropping frames.
+const LATE_GAP_US: u64 = 1_000;
+
 /// What the PIO task has seen so far. Counted over every frame,
 /// while USB only reports a snapshot every [`REPORT_PERIOD_MS`].
 #[derive(Clone, Copy, Default)]
@@ -52,6 +57,10 @@ struct Stats {
     bad_crc: u32,
     /// Replies not queued because the TX FIFO was full.
     tx_full: u32,
+    /// Wake-ups of the PIO task more than [`LATE_GAP_US`] after the previous one.
+    late: u32,
+    /// Longest time between two wake-ups since the last USB report, µs.
+    max_gap_us: u32,
 }
 
 static STATS: Mutex<ThreadModeRawMutex, Cell<Stats>> = Mutex::new(Cell::new(Stats {
@@ -60,6 +69,8 @@ static STATS: Mutex<ThreadModeRawMutex, Cell<Stats>> = Mutex::new(Cell::new(Stat
     frames: 0,
     bad_crc: 0,
     tx_full: 0,
+    late: 0,
+    max_gap_us: 0,
 }));
 
 bind_interrupts!(struct Irqs {
@@ -104,7 +115,8 @@ fn setup_pio_task_sm0<'d>(
         "  nop                 side 1", // ... + 1 = 20 ticks; debug pulse starts
         "  in pins, 1          side 1", // 20 ticks after the edge
         "  wait 1 pin 0        side 0", // wait for the line to rise again
-        "  jmp x-- bit         side 0", // 16 bits; autopush hands the frame to the RX FIFO; X ends as 0xFFFFFFFF
+        "  jmp x-- bit         side 0", // 16 bits; X ends as 0xFFFFFFFF
+        "  push noblock        side 0", // frame to the RX FIFO; if it is full the frame is dropped, the PIO never stalls
         "  set y, 22           side 0",
         "delay:",
         "  jmp y-- delay [15]  side 0", // 23 × 16 = 368 ticks ≈ 30.7 µs
@@ -134,7 +146,7 @@ fn setup_pio_task_sm0<'d>(
     cfg.set_out_pins(&[&dshot_pin]); // `out pins`: reply levels
     cfg.set_set_pins(&[&dshot_pin]); // `set pins`, `set pindirs`: direction switch
     cfg.shift_in = ShiftConfig {
-        auto_fill: true,
+        auto_fill: false, // no autopush: it would stall the PIO on a full RX FIFO
         direction: ShiftDirection::Left,
         threshold: 16,
     };
@@ -160,20 +172,45 @@ async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
     // ~30 µs after the frame, too soon to wait for this task. So the FIFO is kept
     // one reply ahead, as real ESCs do with the last measured value.
     sm.tx().push(encode_reply(E12_STOPPED)); // before the first frame: "motor stopped"
+    let mut last_wake: Option<Instant> = None;
     loop {
-        let raw = sm.rx().wait_pull().await;
-        let result = decode_frame(raw);
+        let mut raw = sm.rx().wait_pull().await;
+        let now = Instant::now();
+        let gap_us = last_wake.map(|t| (now - t).as_micros());
+        last_wake = Some(now);
+
+        // If this task was late, several frames are waiting: count them all,
+        // but queue a single reply, for the newest one (see docs/rx-overflow-plan.md).
+        let mut frames = 0u32;
+        let mut bad_crc = 0u32;
+        let mut result;
+        loop {
+            result = decode_frame(raw);
+            frames += 1;
+            if result.is_err() {
+                bad_crc += 1;
+            }
+            match sm.rx().try_pull() {
+                Some(next) => raw = next,
+                None => break,
+            }
+        }
         let queued = sm.tx().try_push(reply); // for the next frame
+
         STATS.lock(|cell| {
             let mut s = cell.get();
             s.last_raw = Some(raw);
             s.last = Some(result);
-            s.frames = s.frames.wrapping_add(1);
-            if result.is_err() {
-                s.bad_crc = s.bad_crc.wrapping_add(1);
-            }
+            s.frames = s.frames.wrapping_add(frames);
+            s.bad_crc = s.bad_crc.wrapping_add(bad_crc);
             if !queued {
                 s.tx_full = s.tx_full.wrapping_add(1);
+            }
+            if let Some(gap_us) = gap_us {
+                if gap_us > LATE_GAP_US {
+                    s.late = s.late.wrapping_add(1);
+                }
+                s.max_gap_us = s.max_gap_us.max(gap_us.min(u32::MAX as u64) as u32);
             }
             cell.set(s);
         });
@@ -255,14 +292,14 @@ impl From<EndpointError> for Disconnected {
 
 /// One text line for USB.
 struct Line {
-    buf: [u8; 96],
+    buf: [u8; 128],
     len: usize,
 }
 
 impl Line {
     fn new() -> Self {
         Line {
-            buf: [0; 96],
+            buf: [0; 128],
             len: 0,
         }
     }
@@ -285,10 +322,11 @@ impl core::fmt::Write for Line {
 }
 
 /// Formats a snapshot of [`Stats`], e.g.
-/// `7D05 thr=1000 T=0 cmd=0 n=12345 bad=0 txf=0` or `7D04 BAD_CRC n=12346 bad=1 txf=0`.
+/// `7D05 thr=1000 T=0 cmd=0 n=12345 bad=0 txf=0 late=0 gap=251` or
+/// `7D04 BAD_CRC n=12346 bad=1 txf=0 late=0 gap=251`.
 fn format_stats(s: &Stats) -> Line {
     let mut line = Line::new();
-    // The longest line is 68 bytes, so these writes cannot run out of space.
+    // The longest line is 99 bytes, so these writes cannot run out of space.
     let _ = match (s.last_raw, s.last) {
         (Some(raw), Some(Ok(f))) => write!(
             line,
@@ -303,8 +341,8 @@ fn format_stats(s: &Stats) -> Line {
     };
     let _ = write!(
         line,
-        "n={} bad={} txf={}\r\n",
-        s.frames, s.bad_crc, s.tx_full
+        "n={} bad={} txf={} late={} gap={}\r\n",
+        s.frames, s.bad_crc, s.tx_full, s.late, s.max_gap_us
     );
     line
 }
@@ -320,7 +358,11 @@ async fn usb_write<'d, T: Instance + 'd>(
 ) -> Result<(), Disconnected> {
     loop {
         Timer::after_millis(REPORT_PERIOD_MS).await;
-        let stats = STATS.lock(|cell| cell.get());
+        let stats = STATS.lock(|cell| {
+            let s = cell.get();
+            cell.set(Stats { max_gap_us: 0, ..s }); // `gap` covers one report period
+            s
+        });
         for chunk in format_stats(&stats).as_bytes().chunks(USB_CHUNK) {
             usb_tx.write_packet(chunk).await?;
         }

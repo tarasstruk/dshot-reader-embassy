@@ -39,13 +39,16 @@ The received frames are decoded with `dshot-codec` and reported as text over the
 using a CDC+ACM profile, twice a second:
 
 ```
-7D05 thr=1000 T=0 cmd=0 n=12345 bad=0 txf=0
+7D05 thr=1000 T=0 cmd=0 n=12345 bad=0 txf=0 late=0 gap=251
 ```
 
 - `7D05` — the latest frame;
 - `thr` — throttle, `T` — telemetry request bit, `cmd` — 1 for special commands (throttle 0–47);
 - `n` — all frames received, `bad` — frames with a bad CRC (shown as `7D04 BAD_CRC ...`);
 - `txf` — replies that did not fit into the PIO TX FIFO (should stay 0).
+- `late` — times the PIO task woke up more than 1 ms after the previous time (the RX FIFO
+  holds 4 frames, so later the PIO drops frames); `gap` — the longest time between two
+  wake-ups since the previous line, µs (≈ 250 at 4 kHz).
 
 The lines can be seen in terminal, for example:
 
