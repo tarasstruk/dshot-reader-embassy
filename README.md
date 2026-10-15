@@ -10,7 +10,10 @@ and provides a "npn-blocking" alternative to [dshot-reader-test](https://github.
 
 It is being moved to bidirectional DShot 300 (see `docs/action-plan.md`). Currently it receives
 inverted bidirectional frames (the line idles high) and ~30 µs after each frame replies on the same
-wire with a fixed telemetry value of 30 000 eRPM (stage B).
+wire with telemetry that grows linearly with throttle (stage C):
+`eRPM = 1000 + throttle × 20`, e.g. throttle 1000 → 21 000 eRPM (3 000 RPM in Betaflight with 14 poles).
+Special commands (throttle 0–47) get "motor stopped"; after a frame with a bad CRC the reply
+for the last good frame is kept.
 
 ### Hardware
 
@@ -67,7 +70,7 @@ cargo test-codec
 ### Debugging
 
 Watch GPIO0 with a logic analyzer: after each frame from the FC there should be a pause of ~30 µs
-and a 21-bit reply of 2.667 µs per bit (≈ 56 µs). For 30 000 eRPM the reply levels are
+and a 21-bit reply of 2.667 µs per bit (≈ 56 µs). For 30 000 eRPM (`e12 = 0x5F4`) the reply levels are
 `0 11001101010100101101` (see `docs/reply-waveform-0x5F4.md`).
 
 Debug output on GPIO3 (PIO side-set):

@@ -32,8 +32,20 @@ use fixed::types::extra::U8;
 /// the command bit (3.333 µs = 40 ticks) and the reply bit (2.667 µs = 32 ticks).
 const PIO_CLOCK_HZ: u32 = 12_000_000;
 
-/// The fixed telemetry value sent back in stage B.
-const REPLY_ERPM: u32 = 30_000;
+/// Stage C model: the reply eRPM grows linearly with throttle,
+/// `ERPM_BASE + throttle × ERPM_PER_STEP` (docs/bidirectional-dshot-plan.md, step 8):
+/// throttle 48 → 1 960 eRPM, 1000 → 21 000, 2047 → 41 940.
+///
+/// The numbers are a bench toy, not a motor model. The base keeps the slowest reply
+/// above ≈ 919 eRPM, the lowest the reply can carry (docs/erpm-lower-limit.md);
+/// the step makes full throttle ≈ 42 000 eRPM, i.e. ≈ 6 000 RPM with 7 pole pairs.
+const ERPM_BASE: u32 = 1_000;
+const ERPM_PER_STEP: u32 = 20;
+
+/// The reply carries the period of one electrical revolution in µs, not eRPM:
+/// period = 60 s × 1 000 000 µs/s / eRPM, so `period_us = US_PER_MINUTE / erpm`.
+/// E.g. 30 000 eRPM → 60 000 000 / 30 000 = 2000 µs.
+const US_PER_MINUTE: u32 = 60_000_000;
 
 /// How often the latest frame and counters are sent over USB.
 const REPORT_PERIOD_MS: u64 = 500;
@@ -164,14 +176,23 @@ fn setup_pio_task_sm0<'d>(
     sm.set_enable(true);
 }
 
-async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
-    // Stage B: always the same reply, 30 000 eRPM.
-    let reply = encode_reply(encode_period(60_000_000 / REPLY_ERPM));
+/// The reply for a frame: "motor stopped" for special commands (throttle 0–47),
+/// otherwise the eRPM of the linear model.
+fn reply_for(frame: Frame) -> u32 {
+    if frame.is_command() {
+        return encode_reply(E12_STOPPED);
+    }
+    let erpm = ERPM_BASE + frame.throttle as u32 * ERPM_PER_STEP;
+    encode_reply(encode_period(US_PER_MINUTE / erpm))
+}
 
+async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
     // The reply has to be in the TX FIFO before the frame arrives: the PIO takes it
     // ~30 µs after the frame, too soon to wait for this task. So the FIFO is kept
     // one reply ahead, as real ESCs do with the last measured value.
-    sm.tx().push(encode_reply(E12_STOPPED)); // before the first frame: "motor stopped"
+    // After a frame with a bad CRC the reply for the last good frame is kept.
+    let mut reply = encode_reply(E12_STOPPED); // before the first frame: "motor stopped"
+    sm.tx().push(reply);
     let mut last_wake: Option<Instant> = None;
     loop {
         let mut raw = sm.rx().wait_pull().await;
@@ -187,8 +208,9 @@ async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
         loop {
             result = decode_frame(raw);
             frames += 1;
-            if result.is_err() {
-                bad_crc += 1;
+            match result {
+                Ok(frame) => reply = reply_for(frame),
+                Err(_) => bad_crc += 1,
             }
             match sm.rx().try_pull() {
                 Some(next) => raw = next,
