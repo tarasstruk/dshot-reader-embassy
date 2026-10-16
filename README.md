@@ -42,7 +42,7 @@ The received frames are decoded with `dshot-codec` and reported as text over the
 using a CDC+ACM profile, twice a second:
 
 ```
-7D05 thr=1000 T=0 cmd=0 n=12345 bad=0 txf=0 late=0 gap=251
+7D05 thr=1000 T=0 cmd=0 n=12345 bad=0 txf=0 late=0 gap=251 edt=0
 ```
 
 - `7D05` — the latest frame;
@@ -51,7 +51,10 @@ using a CDC+ACM profile, twice a second:
 - `txf` — replies that did not fit into the PIO TX FIFO (should stay 0).
 - `late` — times the PIO task woke up more than 1 ms after the previous time (the RX FIFO
   holds 4 frames, so later the PIO drops frames); `gap` — the longest time between two
-  wake-ups since the previous line, µs (≈ 250 at 4 kHz).
+  wake-ups since the previous line, µs (≈ 250 at 4 kHz);
+- `edt` — 1 when the FC has turned extended telemetry (EDT) on: DShot command 13 six times
+  in a row, answered once with the EDT version frame `0xE02`; command 14 turns it off
+  (answered with `0xEFF`). Temperature and current are not sent yet.
 
 The lines can be seen in terminal, for example:
 

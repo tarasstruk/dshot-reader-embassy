@@ -6,6 +6,7 @@
 //! - [`encode_period`] packs an electrical revolution period into the 12-bit `e12` format.
 //! - [`encode_temperature`] and [`encode_current`] pack extended telemetry (EDT) into `e12`.
 //! - [`decode_telemetry`] tells what an `e12` carries: a period or an EDT value.
+//! - [`EdtSwitch`] turns EDT on and off from repeated DShot commands 13 and 14.
 //! - [`encode_reply`] turns `e12` into the line levels of the telemetry reply,
 //!   ready to be pushed into the PIO TX FIFO.
 //! - [`decode_reply`] is the reverse of [`encode_reply`], as done by the FC.
@@ -189,6 +190,68 @@ pub fn decode_telemetry(e12: u16) -> Telemetry {
             kind: kind as u8,
             value,
         },
+    }
+}
+
+/// DShot command: turn extended telemetry on.
+pub const CMD_EDT_ENABLE: u16 = 13;
+/// DShot command: turn extended telemetry off.
+pub const CMD_EDT_DISABLE: u16 = 14;
+/// A command that changes ESC state takes effect only after this many identical frames
+/// in a row, so that a single corrupted frame cannot change it.
+pub const COMMAND_REPEATS: u8 = 6;
+/// EDT version this ESC reports when EDT is turned on (spec v2).
+pub const EDT_VERSION: u8 = 2;
+/// `e12` sent once when EDT is turned off.
+pub const E12_EDT_DISABLED: u16 = 0xEFF;
+
+/// Packs the EDT version frame, sent once when EDT is turned on: type `0xE`, e.g. `0xE02`.
+pub fn encode_edt_version(version: u8) -> u16 {
+    0xE00 | version as u16
+}
+
+/// Turns EDT on and off from DShot commands [`CMD_EDT_ENABLE`] and [`CMD_EDT_DISABLE`],
+/// each acting after [`COMMAND_REPEATS`] identical frames in a row.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EdtSwitch {
+    enabled: bool,
+    /// Throttle field of the previous frame and how many times in a row it came.
+    last: u16,
+    repeats: u8,
+}
+
+impl EdtSwitch {
+    /// Whether EDT is on.
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// Feeds a frame with a good CRC. Returns the `e12` of a one-off reply when a command
+    /// takes effect: the version frame for "on", [`E12_EDT_DISABLED`] for "off".
+    ///
+    /// The command acts on exactly the [`COMMAND_REPEATS`]-th frame in a row; further
+    /// repeats (Betaflight sends more) do nothing. Any other frame starts the count over.
+    pub fn on_frame(&mut self, frame: Frame) -> Option<u16> {
+        if frame.throttle == self.last {
+            self.repeats = self.repeats.saturating_add(1);
+        } else {
+            self.last = frame.throttle;
+            self.repeats = 1;
+        }
+        if self.repeats != COMMAND_REPEATS {
+            return None;
+        }
+        match frame.throttle {
+            CMD_EDT_ENABLE => {
+                self.enabled = true;
+                Some(encode_edt_version(EDT_VERSION))
+            }
+            CMD_EDT_DISABLE => {
+                self.enabled = false;
+                Some(E12_EDT_DISABLED)
+            }
+            _ => None,
+        }
     }
 }
 
@@ -431,6 +494,75 @@ mod tests {
             let e12 = encode_temperature(v);
             assert_eq!(decode_reply(encode_reply(e12)), Ok(e12));
         }
+    }
+
+    fn feed(edt: &mut EdtSwitch, throttle: u16, times: usize) -> Vec<Option<u16>> {
+        let frame = Frame {
+            throttle,
+            telemetry: true,
+        };
+        (0..times).map(|_| edt.on_frame(frame)).collect()
+    }
+
+    #[test]
+    fn edt_switch_needs_six_in_a_row() {
+        let mut edt = EdtSwitch::default();
+        assert!(!edt.enabled());
+
+        // Five times is not enough.
+        assert_eq!(feed(&mut edt, CMD_EDT_ENABLE, 5), [None; 5]);
+        assert!(!edt.enabled());
+        // The sixth turns EDT on and asks for the version frame once.
+        assert_eq!(
+            edt.on_frame(Frame {
+                throttle: CMD_EDT_ENABLE,
+                telemetry: true
+            }),
+            Some(0xE02)
+        );
+        assert!(edt.enabled());
+        // Betaflight keeps repeating: nothing more happens.
+        assert_eq!(feed(&mut edt, CMD_EDT_ENABLE, 10), [None; 10]);
+        assert!(edt.enabled());
+
+        // Throttle frames in between do not change anything.
+        assert_eq!(feed(&mut edt, 1000, 100), [None; 100]);
+        assert!(edt.enabled());
+
+        // Off: the sixth "14" in a row, answered with 0xEFF.
+        let replies = feed(&mut edt, CMD_EDT_DISABLE, 6);
+        assert_eq!(replies[..5], [None; 5]);
+        assert_eq!(replies[5], Some(E12_EDT_DISABLED));
+        assert!(!edt.enabled());
+    }
+
+    #[test]
+    fn edt_switch_count_restarts_on_other_frame() {
+        let mut edt = EdtSwitch::default();
+        feed(&mut edt, CMD_EDT_ENABLE, 5);
+        feed(&mut edt, 0, 1); // "motor stop" in between
+        assert_eq!(feed(&mut edt, CMD_EDT_ENABLE, 5), [None; 5]);
+        assert!(!edt.enabled());
+        assert_eq!(feed(&mut edt, CMD_EDT_ENABLE, 1), [Some(0xE02)]);
+        assert!(edt.enabled());
+    }
+
+    #[test]
+    fn edt_control_frames_are_edt() {
+        assert_eq!(
+            decode_telemetry(encode_edt_version(EDT_VERSION)),
+            Telemetry::Other {
+                kind: 0xE,
+                value: EDT_VERSION
+            }
+        );
+        assert_eq!(
+            decode_telemetry(E12_EDT_DISABLED),
+            Telemetry::Other {
+                kind: 0xE,
+                value: 0xFF
+            }
+        );
     }
 
     #[test]

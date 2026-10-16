@@ -9,7 +9,9 @@ use panic_halt as _;
 
 use core::cell::Cell;
 use core::fmt::Write as _;
-use dshot_codec::{decode_frame, encode_period, encode_reply, Frame, FrameError, E12_STOPPED};
+use dshot_codec::{
+    decode_frame, encode_period, encode_reply, EdtSwitch, Frame, FrameError, E12_STOPPED,
+};
 use embassy_executor::Spawner;
 use embassy_futures::join::join3;
 use embassy_rp::clocks::clk_sys_freq;
@@ -73,6 +75,8 @@ struct Stats {
     late: u32,
     /// Longest time between two wake-ups since the last USB report, µs.
     max_gap_us: u32,
+    /// Extended telemetry (EDT) turned on by the FC (DShot command 13).
+    edt: bool,
 }
 
 static STATS: Mutex<ThreadModeRawMutex, Cell<Stats>> = Mutex::new(Cell::new(Stats {
@@ -83,6 +87,7 @@ static STATS: Mutex<ThreadModeRawMutex, Cell<Stats>> = Mutex::new(Cell::new(Stat
     tx_full: 0,
     late: 0,
     max_gap_us: 0,
+    edt: false,
 }));
 
 bind_interrupts!(struct Irqs {
@@ -194,6 +199,7 @@ async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
     let mut reply = encode_reply(E12_STOPPED); // before the first frame: "motor stopped"
     sm.tx().push(reply);
     let mut last_wake: Option<Instant> = None;
+    let mut edt = EdtSwitch::default();
     loop {
         let mut raw = sm.rx().wait_pull().await;
         let now = Instant::now();
@@ -204,12 +210,19 @@ async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
         // but queue a single reply, for the newest one (see docs/rx-overflow-plan.md).
         let mut frames = 0u32;
         let mut bad_crc = 0u32;
+        let mut one_off = None;
         let mut result;
         loop {
             result = decode_frame(raw);
             frames += 1;
             match result {
-                Ok(frame) => reply = reply_for(frame),
+                Ok(frame) => {
+                    // DShot commands 13/14, six times in a row, turn EDT on/off.
+                    if let Some(e12) = edt.on_frame(frame) {
+                        one_off = Some(e12);
+                    }
+                    reply = reply_for(frame);
+                }
                 Err(_) => bad_crc += 1,
             }
             match sm.rx().try_pull() {
@@ -217,7 +230,9 @@ async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
                 None => break,
             }
         }
-        let queued = sm.tx().try_push(reply); // for the next frame
+        // The EDT version frame (or "EDT off") goes out once, instead of the period.
+        let next = one_off.map_or(reply, encode_reply);
+        let queued = sm.tx().try_push(next); // for the next frame
 
         STATS.lock(|cell| {
             let mut s = cell.get();
@@ -234,6 +249,7 @@ async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
                 }
                 s.max_gap_us = s.max_gap_us.max(gap_us.min(u32::MAX as u64) as u32);
             }
+            s.edt = edt.enabled();
             cell.set(s);
         });
     }
@@ -344,11 +360,11 @@ impl core::fmt::Write for Line {
 }
 
 /// Formats a snapshot of [`Stats`], e.g.
-/// `7D05 thr=1000 T=0 cmd=0 n=12345 bad=0 txf=0 late=0 gap=251` or
-/// `7D04 BAD_CRC n=12346 bad=1 txf=0 late=0 gap=251`.
+/// `7D05 thr=1000 T=0 cmd=0 n=12345 bad=0 txf=0 late=0 gap=251 edt=0` or
+/// `7D04 BAD_CRC n=12346 bad=1 txf=0 late=0 gap=251 edt=0`.
 fn format_stats(s: &Stats) -> Line {
     let mut line = Line::new();
-    // The longest line is 99 bytes, so these writes cannot run out of space.
+    // The longest line is 105 bytes, so these writes cannot run out of space.
     let _ = match (s.last_raw, s.last) {
         (Some(raw), Some(Ok(f))) => write!(
             line,
@@ -363,8 +379,8 @@ fn format_stats(s: &Stats) -> Line {
     };
     let _ = write!(
         line,
-        "n={} bad={} txf={} late={} gap={}\r\n",
-        s.frames, s.bad_crc, s.tx_full, s.late, s.max_gap_us
+        "n={} bad={} txf={} late={} gap={} edt={}\r\n",
+        s.frames, s.bad_crc, s.tx_full, s.late, s.max_gap_us, s.edt as u8
     );
     line
 }
