@@ -4,6 +4,8 @@
 //! - [`encode_frame`] is the reverse of [`decode_frame`], as done by the FC.
 //! - [`frame_ok`] checks the inverted CRC of a 16-bit frame received from the FC.
 //! - [`encode_period`] packs an electrical revolution period into the 12-bit `e12` format.
+//! - [`encode_temperature`] and [`encode_current`] pack extended telemetry (EDT) into `e12`.
+//! - [`decode_telemetry`] tells what an `e12` carries: a period or an EDT value.
 //! - [`encode_reply`] turns `e12` into the line levels of the telemetry reply,
 //!   ready to be pushed into the PIO TX FIFO.
 //! - [`decode_reply`] is the reverse of [`encode_reply`], as done by the FC.
@@ -135,6 +137,59 @@ pub fn encode_period(period_us: u32) -> u16 {
 /// Unpacks `e12` into the period in µs (`m << e`).
 pub fn decode_period(e12: u16) -> u32 {
     ((e12 & 0x1FF) as u32) << ((e12 >> 9) & 0x07)
+}
+
+// Extended DShot telemetry (EDT, https://github.com/bird-sanctuary/extended-dshot-telemetry)
+// reuses the `e12` slot of the reply. A period always has the top mantissa bit (bit 8) set
+// when `e` > 0, because `encode_period` halves it until it is 256..=511. So values with
+// `e` > 0 and bit 8 clear are free: EDT puts a 4-bit type `eee0` in bits 11..8 and an
+// 8-bit value in bits 7..0. The FC turns EDT on with DShot command 13.
+
+/// EDT type of a temperature value, °C.
+const EDT_TEMPERATURE: u16 = 0x2;
+/// EDT type of a current value, A.
+const EDT_CURRENT: u16 = 0x6;
+
+/// What an `e12` value of a reply carries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Telemetry {
+    /// Electrical revolution period, µs (see [`encode_period`]).
+    Period(u32),
+    /// Temperature, °C (0–255).
+    Temperature(u8),
+    /// Current, A (0–255).
+    Current(u8),
+    /// Any other EDT type (voltage, debug, stress, status, version): `kind` is the
+    /// 4-bit type from bits 11..8, `value` the lower 8 bits.
+    Other { kind: u8, value: u8 },
+}
+
+/// Packs a temperature (°C) into `e12` as EDT: type `0x2`, e.g. 50 °C → `0x232`.
+pub fn encode_temperature(celsius: u8) -> u16 {
+    (EDT_TEMPERATURE << 8) | celsius as u16
+}
+
+/// Packs a current (A) into `e12` as EDT: type `0x6`, e.g. 17 A → `0x611`.
+pub fn encode_current(amps: u8) -> u16 {
+    (EDT_CURRENT << 8) | amps as u16
+}
+
+/// Tells what `e12` carries, as the FC does: a period when the 4-bit type is 0
+/// or bit 8 is set, otherwise an EDT value.
+pub fn decode_telemetry(e12: u16) -> Telemetry {
+    let kind = (e12 >> 8) & 0x0F;
+    if kind == 0 || kind & 1 == 1 {
+        return Telemetry::Period(decode_period(e12));
+    }
+    let value = (e12 & 0xFF) as u8;
+    match kind {
+        EDT_TEMPERATURE => Telemetry::Temperature(value),
+        EDT_CURRENT => Telemetry::Current(value),
+        _ => Telemetry::Other {
+            kind: kind as u8,
+            value,
+        },
+    }
 }
 
 /// Encodes `e12` into the 21 line levels of the reply, left-aligned in a 32-bit word.
@@ -338,6 +393,59 @@ mod tests {
             // For 32895: 127 * 256 = 32512 <= 32895.
             assert!((p - back) * 256 <= p, "period {p} decoded as {back}");
         }
+    }
+
+    #[test]
+    fn edt_examples() {
+        assert_eq!(encode_temperature(50), 0x232);
+        assert_eq!(encode_current(17), 0x611);
+        assert_eq!(decode_telemetry(0x232), Telemetry::Temperature(50));
+        assert_eq!(decode_telemetry(0x611), Telemetry::Current(17));
+        // Voltage (type 0x4, 0.25 V steps): 16.8 V = 67 steps.
+        assert_eq!(
+            decode_telemetry(0x443),
+            Telemetry::Other {
+                kind: 0x4,
+                value: 67
+            }
+        );
+        // The ESC's reply to "EDT enable": version frame, type 0xE.
+        assert_eq!(
+            decode_telemetry(0xE02),
+            Telemetry::Other {
+                kind: 0xE,
+                value: 2
+            }
+        );
+    }
+
+    #[test]
+    fn edt_roundtrip_all_values() {
+        for v in 0..=u8::MAX {
+            assert_eq!(
+                decode_telemetry(encode_temperature(v)),
+                Telemetry::Temperature(v)
+            );
+            assert_eq!(decode_telemetry(encode_current(v)), Telemetry::Current(v));
+            // Through the line as well: CRC, GCR and NRZI do not care what e12 means.
+            let e12 = encode_temperature(v);
+            assert_eq!(decode_reply(encode_reply(e12)), Ok(e12));
+        }
+    }
+
+    #[test]
+    fn period_is_never_taken_for_edt() {
+        // Every e12 that encode_period can produce, including "stopped", must read back
+        // as a period, otherwise the FC would show a made-up temperature or current.
+        for p in 0..=65_536u32 {
+            let e12 = encode_period(p);
+            assert_eq!(
+                decode_telemetry(e12),
+                Telemetry::Period(decode_period(e12)),
+                "period {p}"
+            );
+        }
+        assert_eq!(decode_telemetry(E12_STOPPED), Telemetry::Period(65_408));
     }
 
     #[test]
