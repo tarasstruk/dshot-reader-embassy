@@ -54,7 +54,9 @@ using a CDC+ACM profile, twice a second:
   wake-ups since the previous line, µs (≈ 250 at 4 kHz);
 - `edt` — 1 when the FC has turned extended telemetry (EDT) on: DShot command 13 six times
   in a row, answered once with the EDT version frame `0xE02`; command 14 turns it off
-  (answered with `0xEFF`). Temperature and current are not sent yet.
+  (answered with `0xEFF`). With EDT on, every 64th reply carries a temperature (fixed 42 °C)
+  or a current (0 A at throttle 48 to 20 A at 2047), in turn, instead of the period
+  (see `docs/edt.md`).
 
 The lines can be seen in terminal, for example:
 
