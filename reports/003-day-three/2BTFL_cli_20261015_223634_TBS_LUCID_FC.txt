@@ -1,0 +1,72 @@
+# 
+
+# dshot_telemetry_info
+Dshot reads: 124496
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   R----      0      0      0   0.00%      0   0.00      0      0      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# motor 3 1477
+Using output 3.
+motor 3: 1000
+
+# dshot_telemetry_info
+Dshot reads: 235506
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   R----  21000   3000     50   0.00%      0   0.00      0      0      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# motor 3 2000
+Using output 3.
+motor 3: 2047
+
+# motor 3 1030
+Using output 3.
+motor 3: 106
+
+# motor 3 1500
+Using output 3.
+motor 3: 1046
+
+# motor 3 1000
+Using output 3.
+motor 3: 0
+
+# motor 3 1477
+Using output 3.
+motor 3: 1000
+
+# dshot_telemetry_info
+Dshot reads: 717258
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   R----  21000   3000     50   0.00%      0   0.00      0      0      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# 

@@ -1,0 +1,125 @@
+# 
+
+# motor 3 1400
+Using output 3.
+motor 3: 846
+
+# motor 3 1000
+Using output 3.
+motor 3: 0
+
+# motor 3 1001
+Using output 3.
+motor 3: 48
+
+# motor 3 1000
+Using output 3.
+motor 3: 0
+
+# dshot_telemetry_info
+Dshot reads: 2798433
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   R----      0      0      0   0.00%      0   0.00      0      0      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# motor 3 1001
+Using output 3.
+motor 3: 48
+
+# dshot_telemetry_info
+Dshot reads: 2885792
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   R----   2000    286      4   0.00%      0   0.00      0      0      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# motor 3 1477
+Using output 3.
+motor 3: 1000
+
+# dshot_telemetry_info
+Dshot reads: 3160101
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   R----  21000   3000     50   0.00%      0   0.00      0      0      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# dshot_telemetry_info
+Dshot reads: 3563588
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   R----  21000   3000     50   0.00%      0   0.00      0      0      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# motor 3 2000
+Using output 3.
+motor 3: 2047
+
+# dshot_telemetry_info
+Dshot reads: 3625149
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   R----  42000   6000    100   0.00%      0   0.00      0      0      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# motor 3 1000
+Using output 3.
+motor 3: 0
+
+# dshot_telemetry_info
+Dshot reads: 3833850
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   R----      0      0      0   0.00%      0   0.00      0      0      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# 
