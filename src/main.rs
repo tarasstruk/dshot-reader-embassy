@@ -5,7 +5,7 @@
 #[used]
 pub static BOOT2_FIRMWARE: [u8; 256] = rp2040_boot2::BOOT_LOADER_W25Q080;
 
-use panic_halt as _;
+use {defmt_rtt as _, panic_probe as _};
 
 use core::cell::Cell;
 use core::fmt::Write as _;
@@ -242,6 +242,7 @@ async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
                 Ok(frame) => {
                     // DShot commands 13/14, six times in a row, turn EDT on/off.
                     if let Some(e12) = edt.on_frame(frame) {
+                        defmt::info!("EDT {=bool}: reply {=u16:#x}", edt.enabled(), e12);
                         one_off = Some(e12);
                     }
                     reply = reply_for(frame);
@@ -301,6 +302,7 @@ async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
+    defmt::info!("dshot-reader-embassy: DShot300 on GPIO0, debug on GPIO3");
 
     // Instantiate the USB driver
     let driver = Driver::new(p.USB, Irqs);

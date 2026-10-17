@@ -23,21 +23,27 @@ target = "thumbv6m-none-eabi"
 #   script. This is usually provided by the cortex-m-rt crate, and by default
 #   the version in that crate will include a file called `memory.x` which
 #   describes the particular memory layout for your specific chip. 
+# * linker argument -Tdefmt.x places the defmt log strings (logs go over RTT
+#   to the debug probe)
 # * no-vectorize-loops turns off the loop vectorizer (seeing as the M0+ doesn't
 #   have SIMD)
 rustflags = [
   "-C", "link-arg=--nmagic",
   "-C", "link-arg=-Tlink.x",
+  "-C", "link-arg=-Tdefmt.x",
   "-C", "no-vectorize-loops",
 ]
 
-# This runner will make a UF2 file and then copy it to a mounted RP2040 in USB
-# Bootloader mode:
-runner = "elf2uf2-rs -d"
+# This runner will find a supported SWD debug probe (e.g. the Raspberry Pi
+# Debug Probe), flash your RP2040 over SWD and print the defmt logs:
+runner = "probe-rs run --chip RP2040"
 
-# This runner will find a supported SWD debug probe and flash your RP2040 over
-# SWD:
-# runner = "probe-rs run --chip RP2040"
+# Without a probe: make a UF2 file and copy it to an RP2040 mounted in USB
+# Bootloader mode (BOOTSEL); defmt logs are then not visible:
+# runner = "elf2uf2-rs -d"
+
+[env]
+DEFMT_LOG = "info"
 
 [alias]
 # Host-side tests of the hardware-independent codec (the default build target is the RP2040).

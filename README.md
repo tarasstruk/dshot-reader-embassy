@@ -24,9 +24,24 @@ It can be any ordinary Flight Controller or the [dshot-writer-test](https://gith
 
 ### Installation
 
-The compiled binary could be installed to PR2040 when it's
-connected to the host computer as USB mass storage.
-Then run `cargo r`.
+The firmware is flashed over SWD with a debug probe (e.g. the Raspberry Pi Debug Probe)
+and [probe-rs](https://probe.rs/), as in `gabriele-embassy`:
+
+```shell
+cargo run --release
+```
+
+`probe-rs run --chip RP2040` flashes the RP2040, resets it and then prints the
+[defmt](https://defmt.ferrous-systems.com/) logs (over RTT) until stopped with Ctrl-C;
+the telemetry text still goes over USB (see below). Check that the probe is seen with
+`probe-rs list`.
+
+Always flash the release build: with the debug build, formatting the USB line delays
+the PIO task by ≈ 1.7 ms (see `reports/003-day-three/findings.md`).
+
+Without a probe, put the RP2040 into BOOTSEL mode (it shows up as USB mass storage)
+and switch the runner in `.cargo/config.toml` to `elf2uf2-rs -d`; defmt logs are then
+not visible.
 
 ### Connection
 
