@@ -57,6 +57,12 @@ const EDT_EVERY: u32 = 64;
 const EDT_TEMPERATURE_C: u8 = 42;
 const EDT_CURRENT_MAX_A: u32 = 20;
 
+/// Send EDT from the start, without waiting for DShot command 13. Betaflight sends
+/// command 13 only when arming, and the bench FC cannot arm; with `dshot_edt = FORCE`
+/// it decodes EDT without the command. With `dshot_edt = ON` set this to false.
+/// See docs/edt.md.
+const EDT_AT_START: bool = true;
+
 /// How often the latest frame and counters are sent over USB.
 const REPORT_PERIOD_MS: u64 = 500;
 
@@ -216,7 +222,11 @@ async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
     let mut reply = encode_reply(E12_STOPPED); // before the first frame: "motor stopped"
     sm.tx().push(reply);
     let mut last_wake: Option<Instant> = None;
-    let mut edt = EdtSwitch::default();
+    let mut edt = if EDT_AT_START {
+        EdtSwitch::enabled_at_start()
+    } else {
+        EdtSwitch::default()
+    };
     let mut last_frame: Option<Frame> = None; // last frame with a good CRC
     let mut since_edt = 0u32; // replies since the last EDT value
     let mut current_next = false; // EDT values go in turn: temperature, current, ...

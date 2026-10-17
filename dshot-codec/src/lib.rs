@@ -221,6 +221,16 @@ pub struct EdtSwitch {
 }
 
 impl EdtSwitch {
+    /// A switch with EDT already on, without DShot command 13. For an FC that decodes EDT
+    /// without asking for it (Betaflight `dshot_edt = FORCE` never sends command 13).
+    /// Command 14 still turns it off.
+    pub fn enabled_at_start() -> Self {
+        EdtSwitch {
+            enabled: true,
+            ..Self::default()
+        }
+    }
+
     /// Whether EDT is on.
     pub fn enabled(&self) -> bool {
         self.enabled
@@ -533,6 +543,22 @@ mod tests {
         let replies = feed(&mut edt, CMD_EDT_DISABLE, 6);
         assert_eq!(replies[..5], [None; 5]);
         assert_eq!(replies[5], Some(E12_EDT_DISABLED));
+        assert!(!edt.enabled());
+    }
+
+    #[test]
+    fn edt_switch_enabled_at_start() {
+        let mut edt = EdtSwitch::enabled_at_start();
+        assert!(edt.enabled());
+        // No version frame is sent on its own; command 13 later still answers once.
+        assert_eq!(feed(&mut edt, 1000, 100), [None; 100]);
+        assert_eq!(feed(&mut edt, CMD_EDT_ENABLE, 6)[5], Some(0xE02));
+        assert!(edt.enabled());
+        // Command 14 turns it off.
+        assert_eq!(
+            feed(&mut edt, CMD_EDT_DISABLE, 6)[5],
+            Some(E12_EDT_DISABLED)
+        );
         assert!(!edt.enabled());
     }
 
