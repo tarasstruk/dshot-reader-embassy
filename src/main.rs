@@ -1,10 +1,6 @@
 #![no_std]
 #![no_main]
 
-#[unsafe(link_section = ".boot_loader")]
-#[used]
-pub static BOOT2_FIRMWARE: [u8; 256] = rp2040_boot2::BOOT_LOADER_W25Q080;
-
 use {defmt_rtt as _, panic_probe as _};
 
 use core::cell::Cell;
@@ -23,6 +19,7 @@ use embassy_rp::pio::{
     Common, Config, Direction, Pio, PioPin, ShiftConfig, ShiftDirection, StateMachine,
 };
 use embassy_rp::usb::{Driver, Instance, InterruptHandler as UsbInterruptHandler};
+use embassy_rp::Peri;
 use embassy_rp::{bind_interrupts, pio::InterruptHandler as PioInterruptHandler};
 use embassy_sync::blocking_mutex::{raw::ThreadModeRawMutex, Mutex};
 use embassy_time::{Instant, Timer};
@@ -110,8 +107,8 @@ bind_interrupts!(struct Irqs {
 fn setup_pio_task_sm0<'d>(
     pio: &mut Common<'d, PIO0>,
     sm: &mut StateMachine<'d, PIO0, 0>,
-    dshot_pin: impl PioPin,
-    debug_pin: impl PioPin,
+    dshot_pin: Peri<'d, impl PioPin>,
+    debug_pin: Peri<'d, impl PioPin>,
 ) {
     // Receive: the line idles high, every bit starts with a falling edge,
     // and is low for 75 % of the bit for a 1 and for 37.5 % for a 0.

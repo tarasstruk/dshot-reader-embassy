@@ -23,6 +23,8 @@ target = "thumbv6m-none-eabi"
 #   script. This is usually provided by the cortex-m-rt crate, and by default
 #   the version in that crate will include a file called `memory.x` which
 #   describes the particular memory layout for your specific chip. 
+# * linker argument -Tlink-rp.x places the second stage bootloader (boot2) from
+#   embassy-rp into the BOOT2 region of `memory.x`
 # * linker argument -Tdefmt.x places the defmt log strings (logs go over RTT
 #   to the debug probe)
 # * no-vectorize-loops turns off the loop vectorizer (seeing as the M0+ doesn't
@@ -30,6 +32,7 @@ target = "thumbv6m-none-eabi"
 rustflags = [
   "-C", "link-arg=--nmagic",
   "-C", "link-arg=-Tlink.x",
+  "-C", "link-arg=-Tlink-rp.x",
   "-C", "link-arg=-Tdefmt.x",
   "-C", "no-vectorize-loops",
 ]
