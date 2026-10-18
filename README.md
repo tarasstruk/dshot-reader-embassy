@@ -13,7 +13,8 @@ inverted bidirectional frames (the line idles high) and ~30 µs after each frame
 wire with telemetry that grows linearly with throttle (stage C):
 `eRPM = 1000 + throttle × 20`, e.g. throttle 1000 → 21 000 eRPM (3 000 RPM in Betaflight with 14 poles).
 Special commands (throttle 0–47) get "motor stopped"; after a frame with a bad CRC the reply
-for the last good frame is kept.
+for the last good frame is kept. Extended telemetry (EDT) is sent from the start: temperature,
+voltage, current, status and two debug values (see `docs/edt.md`).
 
 ### Hardware
 
@@ -67,10 +68,13 @@ using a CDC+ACM profile, twice a second:
 - `late` — times the PIO task woke up more than 1 ms after the previous time (the RX FIFO
   holds 4 frames, so later the PIO drops frames); `gap` — the longest time between two
   wake-ups since the previous line, µs (≈ 250 at 4 kHz);
-- `edt` — 1 when the FC has turned extended telemetry (EDT) on: DShot command 13 six times
-  in a row, answered once with the EDT version frame `0xE02`; command 14 turns it off
-  (answered with `0xEFF`). With EDT on, every 64th reply carries a temperature (fixed 42 °C)
-  or a current (0 A at throttle 48 to 20 A at 2047), in turn, instead of the period
+- `edt` — 1 when extended telemetry (EDT) is on. With `EDT_AT_START = true` (in `src/main.rs`,
+  for Betaflight `dshot_edt = FORCE`) it is on from the start; otherwise DShot command 13 six times
+  in a row turns it on (answered once with the version frame `0xE02`), command 14 turns it off
+  (answered with `0xEFF`). With EDT on, every 32nd reply carries one EDT value instead of the
+  period, in turn: temperature (25 °C at standstill to 85 °C at 42 000 eRPM), voltage (16.8 V
+  sagging to 14.0 V), current (0 A at throttle 48 to 20 A at 2047), status (warning from 70 °C,
+  alert from 80 °C), debug 1 (low byte of `bad`), debug 2 (low byte of `late`)
   (see `docs/edt.md`).
 
 The lines can be seen in terminal, for example:
@@ -81,10 +85,15 @@ tio /dev/tty.usbmodem123456781
 
 ### Tests
 
-The hardware-independent encoding lives in the `dshot-codec` crate and is tested on the host:
+The hardware-independent parts are tested on the host:
+
+- `dshot-codec` — encoding of frames, replies and EDT values;
+- `esc-emu` — the bench ESC emulation: what the RP2040 answers to each frame
+  (eRPM and EDT models, EDT schedule); the firmware only moves values between the PIO and it.
 
 ```shell
 cargo test-codec
+cargo test-esc-emu
 ```
 
 ### Debugging
