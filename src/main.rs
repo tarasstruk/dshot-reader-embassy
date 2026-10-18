@@ -5,10 +5,7 @@ use {defmt_rtt as _, panic_probe as _};
 
 use core::cell::Cell;
 use core::fmt::Write as _;
-use dshot_codec::{
-    decode_frame, encode_current, encode_period, encode_reply, encode_temperature, EdtSwitch,
-    Frame, FrameError, E12_STOPPED, THROTTLE_MAX, THROTTLE_MIN,
-};
+use dshot_codec::{Frame, FrameError};
 use embassy_executor::Spawner;
 use embassy_futures::join::join3;
 use embassy_rp::clocks::clk_sys_freq;
@@ -26,36 +23,12 @@ use embassy_time::{Instant, Timer};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, Sender, State};
 use embassy_usb::driver::EndpointError;
 use embassy_usb::{Builder, Config as UsbConfig};
+use esc_emu::Esc;
 use fixed::types::extra::U8;
 
 /// PIO state machine clock: 12 MHz gives whole numbers of ticks for both
 /// the command bit (3.333 µs = 40 ticks) and the reply bit (2.667 µs = 32 ticks).
 const PIO_CLOCK_HZ: u32 = 12_000_000;
-
-/// Stage C model: the reply eRPM grows linearly with throttle,
-/// `ERPM_BASE + throttle × ERPM_PER_STEP` (docs/bidirectional-dshot-plan.md, step 8):
-/// throttle 48 → 1 960 eRPM, 1000 → 21 000, 2047 → 41 940.
-///
-/// The numbers are a bench toy, not a motor model. The base keeps the slowest reply
-/// above ≈ 919 eRPM, the lowest the reply can carry (docs/erpm-lower-limit.md);
-/// the step makes full throttle ≈ 42 000 eRPM, i.e. ≈ 6 000 RPM with 7 pole pairs.
-const ERPM_BASE: u32 = 1_000;
-const ERPM_PER_STEP: u32 = 20;
-
-/// The reply carries the period of one electrical revolution in µs, not eRPM:
-/// period = 60 s × 1 000 000 µs/s / eRPM, so `period_us = US_PER_MINUTE / erpm`.
-/// E.g. 30 000 eRPM → 60 000 000 / 30 000 = 2000 µs.
-const US_PER_MINUTE: u32 = 60_000_000;
-
-/// With EDT on, every `EDT_EVERY`-th reply carries temperature or current (in turn)
-/// instead of the period: 64 × 250 µs = 16 ms, so each value ≈ every 32 ms, and the FC
-/// loses only 1/64 of the eRPM samples. See docs/edt.md.
-const EDT_EVERY: u32 = 64;
-
-/// EDT bench toy values, like the eRPM model: there is no motor, so the temperature
-/// is fixed and the current grows linearly with throttle, 0 A at 48 to 20 A at 2047.
-const EDT_TEMPERATURE_C: u8 = 42;
-const EDT_CURRENT_MAX_A: u32 = 20;
 
 /// Send EDT from the start, without waiting for DShot command 13. Betaflight sends
 /// command 13 only when arming, and the bench FC cannot arm; with `dshot_edt = FORCE`
@@ -195,41 +168,12 @@ fn setup_pio_task_sm0<'d>(
     sm.set_enable(true);
 }
 
-/// The reply for a frame: "motor stopped" for special commands (throttle 0–47),
-/// otherwise the eRPM of the linear model.
-fn reply_for(frame: Frame) -> u32 {
-    if frame.is_command() {
-        return encode_reply(E12_STOPPED);
-    }
-    let erpm = ERPM_BASE + frame.throttle as u32 * ERPM_PER_STEP;
-    encode_reply(encode_period(US_PER_MINUTE / erpm))
-}
-
-/// The EDT current for a frame: 0 A for special commands, otherwise the linear model.
-fn current_for(frame: Frame) -> u8 {
-    if frame.is_command() {
-        return 0;
-    }
-    let step = (frame.throttle - THROTTLE_MIN) as u32;
-    (step * EDT_CURRENT_MAX_A / (THROTTLE_MAX - THROTTLE_MIN) as u32) as u8
-}
-
 async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
-    // The reply has to be in the TX FIFO before the frame arrives: the PIO takes it
-    // ~30 µs after the frame, too soon to wait for this task. So the FIFO is kept
-    // one reply ahead, as real ESCs do with the last measured value.
-    // After a frame with a bad CRC the reply for the last good frame is kept.
-    let mut reply = encode_reply(E12_STOPPED); // before the first frame: "motor stopped"
-    sm.tx().push(reply);
+    // The reply logic lives in esc-emu (testable on the PC); this task only moves
+    // values between the PIO FIFOs and the emulated ESC, and counts.
+    let mut esc = Esc::new(EDT_AT_START);
+    sm.tx().push(esc.first_reply()); // before the first frame: "motor stopped"
     let mut last_wake: Option<Instant> = None;
-    let mut edt = if EDT_AT_START {
-        EdtSwitch::enabled_at_start()
-    } else {
-        EdtSwitch::default()
-    };
-    let mut last_frame: Option<Frame> = None; // last frame with a good CRC
-    let mut since_edt = 0u32; // replies since the last EDT value
-    let mut current_next = false; // EDT values go in turn: temperature, current, ...
     loop {
         let mut raw = sm.rx().wait_pull().await;
         let now = Instant::now();
@@ -240,50 +184,23 @@ async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
         // but queue a single reply, for the newest one (see docs/rx-overflow-plan.md).
         let mut frames = 0u32;
         let mut bad_crc = 0u32;
-        let mut one_off = None;
         let mut result;
         loop {
-            result = decode_frame(raw);
+            let rx = esc.on_raw(raw);
+            result = rx.result;
             frames += 1;
-            match result {
-                Ok(frame) => {
-                    // DShot commands 13/14, six times in a row, turn EDT on/off.
-                    if let Some(e12) = edt.on_frame(frame) {
-                        defmt::info!("EDT {=bool}: reply {=u16:#x}", edt.enabled(), e12);
-                        one_off = Some(e12);
-                    }
-                    reply = reply_for(frame);
-                    last_frame = Some(frame);
-                }
-                Err(_) => bad_crc += 1,
+            if result.is_err() {
+                bad_crc += 1;
+            }
+            if let Some(e12) = rx.edt_event {
+                defmt::info!("EDT {=bool}: reply {=u16:#x}", esc.edt_enabled(), e12);
             }
             match sm.rx().try_pull() {
                 Some(next) => raw = next,
                 None => break,
             }
         }
-        let next = match one_off {
-            // The EDT version frame (or "EDT off") goes out once, instead of the period.
-            Some(e12) => encode_reply(e12),
-            // With EDT on, now and then temperature or current instead of the period.
-            None if edt.enabled() => {
-                since_edt += 1;
-                if since_edt < EDT_EVERY {
-                    reply
-                } else {
-                    since_edt = 0;
-                    let e12 = if current_next {
-                        encode_current(last_frame.map_or(0, current_for))
-                    } else {
-                        encode_temperature(EDT_TEMPERATURE_C)
-                    };
-                    current_next = !current_next;
-                    encode_reply(e12)
-                }
-            }
-            None => reply,
-        };
-        let queued = sm.tx().try_push(next); // for the next frame
+        let queued = sm.tx().try_push(esc.next_reply()); // for the next frame
 
         STATS.lock(|cell| {
             let mut s = cell.get();
@@ -300,7 +217,7 @@ async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
                 }
                 s.max_gap_us = s.max_gap_us.max(gap_us.min(u32::MAX as u64) as u32);
             }
-            s.edt = edt.enabled();
+            s.edt = esc.edt_enabled();
             cell.set(s);
         });
     }

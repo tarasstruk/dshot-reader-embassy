@@ -5,13 +5,14 @@ edition = "2021"
 rust-version = "1.83"
 
 [workspace]
-members = ["dshot-codec"]
+members = ["dshot-codec", "esc-emu"]
 
 [dependencies]
 cortex-m-rt = "0.7.7"
 defmt = "1.0.1"
 defmt-rtt = "1.0.0"
 dshot-codec = { path = "dshot-codec" }
+esc-emu = { path = "esc-emu" }
 embassy-executor = { version = "0.9.0", features = ["arch-cortex-m", "executor-thread"] }
 embassy-futures = "0.1.2"
 embassy-rp = { version = "0.9.0", features = ["time-driver", "critical-section-impl", "rp2040"] }

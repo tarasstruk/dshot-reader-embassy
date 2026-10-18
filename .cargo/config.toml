@@ -51,3 +51,5 @@ DEFMT_LOG = "info"
 [alias]
 # Host-side tests of the hardware-independent codec (the default build target is the RP2040).
 test-codec = "test -p dshot-codec --target x86_64-unknown-linux-gnu"
+# Host-side tests of the bench ESC emulation (reply models, EDT scheduling).
+test-esc-emu = "test -p esc-emu --target x86_64-unknown-linux-gnu"

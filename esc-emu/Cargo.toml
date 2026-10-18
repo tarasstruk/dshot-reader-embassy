@@ -1,0 +1,9 @@
+[package]
+name = "esc-emu"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+description = "Bench ESC emulation for bidirectional DShot: reply models and EDT scheduling"
+
+[dependencies]
+dshot-codec = { path = "../dshot-codec" }
