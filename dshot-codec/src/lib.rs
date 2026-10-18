@@ -4,7 +4,8 @@
 //! - [`encode_frame`] is the reverse of [`decode_frame`], as done by the FC.
 //! - [`frame_ok`] checks the inverted CRC of a 16-bit frame received from the FC.
 //! - [`encode_period`] packs an electrical revolution period into the 12-bit `e12` format.
-//! - [`encode_temperature`] and [`encode_current`] pack extended telemetry (EDT) into `e12`.
+//! - [`encode_temperature`], [`encode_voltage`], [`encode_current`], [`encode_status`],
+//!   [`encode_debug1`] and [`encode_debug2`] pack extended telemetry (EDT) into `e12`.
 //! - [`decode_telemetry`] tells what an `e12` carries: a period or an EDT value.
 //! - [`EdtSwitch`] turns EDT on and off from repeated DShot commands 13 and 14.
 //! - [`encode_reply`] turns `e12` into the line levels of the telemetry reply,
@@ -148,8 +149,31 @@ pub fn decode_period(e12: u16) -> u32 {
 
 /// EDT type of a temperature value, °C.
 const EDT_TEMPERATURE: u16 = 0x2;
+/// EDT type of a voltage value, 0.25 V steps.
+const EDT_VOLTAGE: u16 = 0x4;
 /// EDT type of a current value, A.
 const EDT_CURRENT: u16 = 0x6;
+/// EDT type of debug value 1.
+const EDT_DEBUG1: u16 = 0x8;
+/// EDT type of debug value 2.
+const EDT_DEBUG2: u16 = 0xA;
+/// EDT type of a status value (flags and max stress). The version frame and
+/// "EDT off" ([`E12_EDT_DISABLED`]) use the same type; the FC tells them apart by
+/// context, as a reply to DShot command 13 or 14.
+const EDT_STATUS: u16 = 0xE;
+
+/// EDT status: event flags and the highest stress level since the last status frame.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Status {
+    /// Bit 7: alert event.
+    pub alert: bool,
+    /// Bit 6: warning event.
+    pub warning: bool,
+    /// Bit 5: error event.
+    pub error: bool,
+    /// Bits 3..0: max stress level, 0–15. Bit 4 is unused.
+    pub max_stress: u8,
+}
 
 /// What an `e12` value of a reply carries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -158,10 +182,18 @@ pub enum Telemetry {
     Period(u32),
     /// Temperature, °C (0–255).
     Temperature(u8),
+    /// Voltage in 0.25 V steps (0–255, i.e. 0–63.75 V).
+    Voltage(u8),
     /// Current, A (0–255).
     Current(u8),
-    /// Any other EDT type (voltage, debug, stress, status, version): `kind` is the
-    /// 4-bit type from bits 11..8, `value` the lower 8 bits.
+    /// Debug value 1 (0–255), meaning up to the ESC.
+    Debug1(u8),
+    /// Debug value 2 (0–255), meaning up to the ESC.
+    Debug2(u8),
+    /// Status flags and max stress (also what the version frame decodes to).
+    Status(Status),
+    /// Any other EDT type (stress level `0xC`): `kind` is the 4-bit type from
+    /// bits 11..8, `value` the lower 8 bits.
     Other { kind: u8, value: u8 },
 }
 
@@ -170,9 +202,34 @@ pub fn encode_temperature(celsius: u8) -> u16 {
     (EDT_TEMPERATURE << 8) | celsius as u16
 }
 
+/// Packs a voltage in 0.25 V steps into `e12` as EDT: type `0x4`,
+/// e.g. 15.25 V = 61 steps → `0x43D`.
+pub fn encode_voltage(quarter_volts: u8) -> u16 {
+    (EDT_VOLTAGE << 8) | quarter_volts as u16
+}
+
 /// Packs a current (A) into `e12` as EDT: type `0x6`, e.g. 17 A → `0x611`.
 pub fn encode_current(amps: u8) -> u16 {
     (EDT_CURRENT << 8) | amps as u16
+}
+
+/// Packs debug value 1 into `e12` as EDT: type `0x8`.
+pub fn encode_debug1(value: u8) -> u16 {
+    (EDT_DEBUG1 << 8) | value as u16
+}
+
+/// Packs debug value 2 into `e12` as EDT: type `0xA`.
+pub fn encode_debug2(value: u8) -> u16 {
+    (EDT_DEBUG2 << 8) | value as u16
+}
+
+/// Packs a status into `e12` as EDT: type `0xE`, e.g. warning + stress 11 → `0xE4B`.
+/// `max_stress` above 15 is cut to 4 bits.
+pub fn encode_status(status: Status) -> u16 {
+    debug_assert!(status.max_stress <= 0x0F);
+    let flags =
+        (status.alert as u16) << 7 | (status.warning as u16) << 6 | (status.error as u16) << 5;
+    (EDT_STATUS << 8) | flags | (status.max_stress & 0x0F) as u16
 }
 
 /// Tells what `e12` carries, as the FC does: a period when the 4-bit type is 0
@@ -185,7 +242,16 @@ pub fn decode_telemetry(e12: u16) -> Telemetry {
     let value = (e12 & 0xFF) as u8;
     match kind {
         EDT_TEMPERATURE => Telemetry::Temperature(value),
+        EDT_VOLTAGE => Telemetry::Voltage(value),
         EDT_CURRENT => Telemetry::Current(value),
+        EDT_DEBUG1 => Telemetry::Debug1(value),
+        EDT_DEBUG2 => Telemetry::Debug2(value),
+        EDT_STATUS => Telemetry::Status(Status {
+            alert: value & 0x80 != 0,
+            warning: value & 0x40 != 0,
+            error: value & 0x20 != 0,
+            max_stress: value & 0x0F,
+        }),
         _ => Telemetry::Other {
             kind: kind as u8,
             value,
@@ -474,22 +540,67 @@ mod tests {
         assert_eq!(encode_current(17), 0x611);
         assert_eq!(decode_telemetry(0x232), Telemetry::Temperature(50));
         assert_eq!(decode_telemetry(0x611), Telemetry::Current(17));
-        // Voltage (type 0x4, 0.25 V steps): 16.8 V = 67 steps.
+        // Voltage (type 0x4, 0.25 V steps): 16.75 V = 67 steps, 15.25 V = 61 steps.
+        assert_eq!(encode_voltage(67), 0x443);
+        assert_eq!(encode_voltage(61), 0x43D);
+        assert_eq!(decode_telemetry(0x443), Telemetry::Voltage(67));
+        assert_eq!(encode_debug1(5), 0x805);
+        assert_eq!(encode_debug2(200), 0xAC8);
+        assert_eq!(decode_telemetry(0x805), Telemetry::Debug1(5));
+        assert_eq!(decode_telemetry(0xAC8), Telemetry::Debug2(200));
+        // Stress level (type 0xC) is not sent by us: stays Other.
         assert_eq!(
-            decode_telemetry(0x443),
+            decode_telemetry(0xC07),
             Telemetry::Other {
-                kind: 0x4,
-                value: 67
+                kind: 0xC,
+                value: 7
             }
         );
-        // The ESC's reply to "EDT enable": version frame, type 0xE.
-        assert_eq!(
-            decode_telemetry(0xE02),
-            Telemetry::Other {
-                kind: 0xE,
-                value: 2
+    }
+
+    #[test]
+    fn edt_status_examples() {
+        // docs/day-005.md, table 2.1: warning at 70 °C with stress 11,
+        // warning + alert at 84 °C with stress 14.
+        let warning = Status {
+            warning: true,
+            max_stress: 11,
+            ..Status::default()
+        };
+        let alert = Status {
+            alert: true,
+            warning: true,
+            max_stress: 14,
+            ..Status::default()
+        };
+        let error = Status {
+            error: true,
+            ..Status::default()
+        };
+        assert_eq!(encode_status(warning), 0xE4B);
+        assert_eq!(encode_status(alert), 0xECE);
+        assert_eq!(encode_status(error), 0xE20);
+        assert_eq!(encode_status(Status::default()), 0xE00);
+        assert_eq!(decode_telemetry(0xE4B), Telemetry::Status(warning));
+        assert_eq!(decode_telemetry(0xECE), Telemetry::Status(alert));
+        assert_eq!(decode_telemetry(0xE20), Telemetry::Status(error));
+    }
+
+    #[test]
+    fn edt_status_roundtrip_all_values() {
+        for flags in 0..8u8 {
+            for max_stress in 0..=15u8 {
+                let st = Status {
+                    alert: flags & 4 != 0,
+                    warning: flags & 2 != 0,
+                    error: flags & 1 != 0,
+                    max_stress,
+                };
+                let e12 = encode_status(st);
+                assert_eq!(decode_telemetry(e12), Telemetry::Status(st), "{st:?}");
+                assert_eq!(decode_reply(encode_reply(e12)), Ok(e12));
             }
-        );
+        }
     }
 
     #[test]
@@ -499,7 +610,10 @@ mod tests {
                 decode_telemetry(encode_temperature(v)),
                 Telemetry::Temperature(v)
             );
+            assert_eq!(decode_telemetry(encode_voltage(v)), Telemetry::Voltage(v));
             assert_eq!(decode_telemetry(encode_current(v)), Telemetry::Current(v));
+            assert_eq!(decode_telemetry(encode_debug1(v)), Telemetry::Debug1(v));
+            assert_eq!(decode_telemetry(encode_debug2(v)), Telemetry::Debug2(v));
             // Through the line as well: CRC, GCR and NRZI do not care what e12 means.
             let e12 = encode_temperature(v);
             assert_eq!(decode_reply(encode_reply(e12)), Ok(e12));
@@ -575,19 +689,23 @@ mod tests {
 
     #[test]
     fn edt_control_frames_are_edt() {
+        // The version frame and "EDT off" share type 0xE with Status: without the
+        // context of command 13/14 they decode as a status, never as a period.
         assert_eq!(
             decode_telemetry(encode_edt_version(EDT_VERSION)),
-            Telemetry::Other {
-                kind: 0xE,
-                value: EDT_VERSION
-            }
+            Telemetry::Status(Status {
+                max_stress: EDT_VERSION,
+                ..Status::default()
+            })
         );
         assert_eq!(
             decode_telemetry(E12_EDT_DISABLED),
-            Telemetry::Other {
-                kind: 0xE,
-                value: 0xFF
-            }
+            Telemetry::Status(Status {
+                alert: true,
+                warning: true,
+                error: true,
+                max_stress: 15
+            })
         );
     }
 
