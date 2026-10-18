@@ -1,0 +1,189 @@
+# 
+
+# dshot_telemetry_info
+Dshot reads: 0
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# motor 3 1477
+Using output 3.
+motor 3: 1000
+
+# dshot_telemetry_info
+Dshot reads: 47360
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   RTVCS  21000   3000     50   0.00%     55  15.25      9      7      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# motor 3 1777
+Using output 3.
+motor 3: 1600
+
+# dshot_telemetry_info
+Dshot reads: 98066
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   RTVCS  33000   4714     78   0.00%     72  14.50     15     75      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# motor 3 2000
+Using output 3.
+motor 3: 2047
+
+# dshot_telemetry_info
+Dshot reads: 146989
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   RTVCS  42000   6000    100   0.00%     84  14.00     20    206      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# motor 3 1000
+Using output 3.
+motor 3: 0
+
+# dshot_telemetry_info
+Dshot reads: 193037
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   RTVCS      0      0      0   0.00%     25  16.75      0      0      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# motor 3 1020
+Using output 3.
+motor 3: 86
+
+# dshot_telemetry_info
+Dshot reads: 358318
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   RTVCS   2700    386      6   0.00%     28  16.50      0      0      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# motor 3 1200
+Using output 3.
+motor 3: 446
+
+# dshot_telemetry_info
+Dshot reads: 397076
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   RTVCS   9900   1414     23   0.00%     39  16.00      3      3      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# motor 3 1600
+Using output 3.
+motor 3: 1246
+
+# dshot_telemetry_info
+Dshot reads: 435915
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   RTVCS  26000   3714     61   0.00%     62  15.00     11      9      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# motor 3 1890
+Using output 3.
+motor 3: 1826
+
+# dshot_telemetry_info
+Dshot reads: 520399
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   RTVCS  37600   5371     89   0.00%     78  14.25     17     77      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# motor 3 2000
+Using output 3.
+motor 3: 2047
+
+# dshot_telemetry_info
+Dshot reads: 557415
+Dshot invalid pkts: 0
+Dshot directionChange cycles: 0, micros: 0
+
+Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3
+=====  ====== ====== ====== ====== ======= ====== ====== ====== ====== ====== ====== ======
+    1   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    2   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    3   -----      0      0      0 NO DATA      0   0.00      0      0      0      0      0
+    4   RTVCS  42000   6000    100   0.00%     84  14.00     20    206      0      0      0
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+# 
