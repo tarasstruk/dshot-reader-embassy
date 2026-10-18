@@ -23,7 +23,7 @@ use embassy_time::{Instant, Timer};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, Sender, State};
 use embassy_usb::driver::EndpointError;
 use embassy_usb::{Builder, Config as UsbConfig};
-use esc_emu::Esc;
+use esc_emu::{Counters, Esc};
 use fixed::types::extra::U8;
 
 /// PIO state machine clock: 12 MHz gives whole numbers of ticks for both
@@ -174,6 +174,8 @@ async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
     let mut esc = Esc::new(EDT_AT_START);
     sm.tx().push(esc.first_reply()); // before the first frame: "motor stopped"
     let mut last_wake: Option<Instant> = None;
+    // Totals since start, also sent as EDT debug 1 / debug 2.
+    let mut counters = Counters::default();
     loop {
         let mut raw = sm.rx().wait_pull().await;
         let now = Instant::now();
@@ -200,7 +202,11 @@ async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
                 None => break,
             }
         }
-        let queued = sm.tx().try_push(esc.next_reply()); // for the next frame
+        counters.bad = counters.bad.wrapping_add(bad_crc);
+        if gap_us.is_some_and(|gap_us| gap_us > LATE_GAP_US) {
+            counters.late = counters.late.wrapping_add(1);
+        }
+        let queued = sm.tx().try_push(esc.next_reply(counters)); // for the next frame
 
         STATS.lock(|cell| {
             let mut s = cell.get();
