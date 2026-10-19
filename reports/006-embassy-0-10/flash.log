@@ -1,0 +1,4 @@
+     Finished in 1.81s
+[INFO ] dshot-reader-embassy: DShot300 on GPIO0, debug on GPIO3 (dshot_reader_embassy dshot-reader-embassy/src/main.rs:235)
+Received Ctrl+C, exiting
+Exited by user request

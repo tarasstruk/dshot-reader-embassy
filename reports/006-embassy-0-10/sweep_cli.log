@@ -1,0 +1,13 @@
+CLI: #
+motor 3 1001 -> '48' | FC: 4 RTVCS 2000 286 4 0.00% 27 16.50 0 0 0 0 0 | RP2040: 0609 thr=48 T=0 cmd=0 n=59895 bad=0 txf=0 late=0 gap=255 edt=1
+motor 3 1250 -> '546' | FC: 4 RTVCS 11900 1700 28 0.00% 42 16.00 4 4 0 0 0 | RP2040: 444B thr=546 T=0 cmd=0 n=70001 bad=0 txf=0 late=0 gap=265 edt=1
+motor 3 1500 -> '1046' | FC: 4 RTVCS 21900 3129 52 0.00% 56 15.25 9 7 0 0 0 | RP2040: 82C9 thr=1046 T=0 cmd=0 n=82129 bad=0 txf=0 late=0 gap=295 edt=1
+motor 3 1750 -> '1546' | FC: 4 RTVCS 32000 4571 76 0.00% 70 14.50 14 75 0 0 0 | RP2040: C146 thr=1546 T=0 cmd=0 n=92235 bad=0 txf=0 late=0 gap=258 edt=1
+motor 3 2000 -> '2047' | FC: 4 RTVCS 42000 6000 100 0.00% 84 14.00 20 206 0 0 0 | RP2040: FFE1 thr=2047 T=0 cmd=0 n=104363 bad=0 txf=0 late=0 gap=260 edt=1
+motor 3 1000 -> '0' | FC: 4 RTVCS 0 0 0 0.00% 25 16.75 0 0 0 0 0
+telemetry header: ['Motor    Type   eRPM    RPM     Hz Invalid   TEMP    VCC   CURR  ST/EV   DBG1   DBG2   DBG3']
+exit: exit
+
+# leaving CLI mode, unsaved changes lost
+
+Rebooting
