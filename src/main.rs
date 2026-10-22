@@ -19,7 +19,7 @@ use embassy_rp::usb::{Driver, Instance, InterruptHandler as UsbInterruptHandler}
 use embassy_rp::Peri;
 use embassy_rp::{bind_interrupts, pio::InterruptHandler as PioInterruptHandler};
 use embassy_sync::blocking_mutex::{raw::ThreadModeRawMutex, Mutex};
-use embassy_time::{Instant, Timer};
+use embassy_time::{with_timeout, Duration, Instant, Timer};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, Sender, State};
 use embassy_usb::driver::EndpointError;
 use embassy_usb::{Builder, Config as UsbConfig};
@@ -38,6 +38,14 @@ const EDT_AT_START: bool = true;
 
 /// How often the latest frame and counters are sent over USB.
 const REPORT_PERIOD_MS: u64 = 500;
+
+/// How often to look whether a terminal has opened the USB port (DTR set).
+const DTR_POLL_MS: u64 = 10;
+
+/// How long one USB packet may wait for the host. A host that keeps the port open but does
+/// not read would otherwise stop the USB loop; after this the line is dropped, so nothing
+/// piles up to come out later as a stale line.
+const USB_WRITE_TIMEOUT_MS: u64 = 50;
 
 /// A wake-up of the PIO task later than this after the previous one counts as late.
 /// Frames come every 250 µs at 4 kHz, and the RX FIFO holds 4 of them,
@@ -271,10 +279,11 @@ async fn main(_spawner: Spawner) {
     // We need only the writer to send bytes over it.
     let (mut usb_tx, _usb_rx) = class.split();
 
-    // Wait for a connection and write to USB
+    // Lines go out only while a terminal holds the port open (DTR set): nothing is queued
+    // while it is closed, so the first line after opening is a fresh one (docs/day-007.md).
     let usb_future = async {
         loop {
-            usb_tx.wait_connection().await;
+            wait_for_terminal(&mut usb_tx).await;
             let _ = usb_write(&mut usb_tx).await;
         }
     };
@@ -365,19 +374,45 @@ fn format_stats(s: &Stats) -> Line {
 /// for the host to deliver the line right away.
 const USB_CHUNK: usize = 63;
 
-/// Write the latest frame and counters to USB as text.
+/// Waits until a terminal opens the port. `wait_connection` alone is not enough: it waits
+/// only for the host to configure the USB device and then returns at once every time, so a
+/// loop around it would never give the PIO task a turn while the port is closed.
+async fn wait_for_terminal<'d, T: Instance + 'd>(usb_tx: &mut Sender<'d, Driver<'d, T>>) {
+    usb_tx.wait_connection().await;
+    while !usb_tx.dtr() {
+        Timer::after_millis(DTR_POLL_MS).await;
+    }
+}
+
+/// Write the latest frame and counters to USB as text, every [`REPORT_PERIOD_MS`], while
+/// the port is open. Returns when the port is closed or the host stops taking packets.
 async fn usb_write<'d, T: Instance + 'd>(
     usb_tx: &mut Sender<'d, Driver<'d, T>>,
 ) -> Result<(), Disconnected> {
+    // `gap` from the moment the port was opened: the time it stayed closed is not shown.
+    STATS.lock(|cell| {
+        cell.set(Stats {
+            max_gap_us: 0,
+            ..cell.get()
+        })
+    });
     loop {
         Timer::after_millis(REPORT_PERIOD_MS).await;
+        if !usb_tx.dtr() {
+            return Err(Disconnected {});
+        }
         let stats = STATS.lock(|cell| {
             let s = cell.get();
             cell.set(Stats { max_gap_us: 0, ..s }); // `gap` covers one report period
             s
         });
         for chunk in format_stats(&stats).as_bytes().chunks(USB_CHUNK) {
-            usb_tx.write_packet(chunk).await?;
+            let write = usb_tx.write_packet(chunk);
+            match with_timeout(Duration::from_millis(USB_WRITE_TIMEOUT_MS), write).await {
+                Ok(written) => written?,
+                // The host does not take packets: drop the line.
+                Err(_) => return Err(Disconnected {}),
+            }
         }
     }
 }
