@@ -33,7 +33,7 @@ Keep this split: protocol in `dshot-codec`, bench/ESC policy in `esc-emu`, anyth
 - **PIO0 SM0** (`setup_pio_task_sm0`): one program that receives a frame on **GPIO0**, waits ≈ 31 µs, drives the line and sends the 21-level reply from the TX FIFO, then releases the line. PIO clock 12 MHz (`PIO_CLOCK_HZ`, divider `0xA6B` → 11 998 500 Hz): command bit = 40 ticks, reply bit = 32 ticks. Sampling ≈ 1.7 µs after each falling edge. No autopush: `push noblock`, so a slow CPU drops frames instead of stalling the PIO.
 - **GPIO3** — debug output via side-set: a ~170 ns pulse at each bit sample, high for the whole reply.
 - **`pio_task_sm0`**: on each wake-up drains the RX FIFO into `Esc::on_raw`, pushes one `Esc::next_reply(counters)` into the TX FIFO (reply is always one frame ahead), updates `STATS`.
-- **USB CDC** (VID `c0de`, product `DShot logger`): one text line every 500 ms, e.g. `7D05 thr=1000 T=0 cmd=0 n=12345 bad=0 txf=0 late=0 gap=251 edt=1`.
+- **USB CDC** (VID `c0de`, product `DShot logger`): one text line every 500 ms, e.g. `7D05 thr=1000 T=0 cmd=0 n=12345 bad=0 txf=0 late=0 gap=251 edt=1` — **only while a terminal holds the port open (DTR)**. Nothing is queued while it is closed, so the first line after opening is fresh (≈ 0.5 s after opening); `gap` is reset when the port is opened. `wait_connection()` alone does not wait for DTR (it returns at once once USB is configured) — `wait_for_terminal` polls DTR with a `Timer`. Each packet is written with a 50 ms timeout (day 007).
 - **defmt over RTT**: start-up line and EDT on/off events, visible through the debug probe.
 - `EDT_AT_START = true`: EDT on from boot (Betaflight with `dshot_edt = FORCE` never sends DShot command 13 on a bench FC that cannot arm).
 

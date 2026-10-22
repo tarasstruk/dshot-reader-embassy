@@ -1,0 +1,15 @@
+FC /dev/ttyACM1, ESC /dev/ttyACM0, log ../dshot-reader-embassy/reports/007-usb-dtr/sweep.log
+motor 1001 → motor: 48: pass
+motor 1250 → motor: 546: pass
+motor 1500 → motor: 1046: pass
+motor 1750 → motor: 1546: pass
+motor 2000 → motor: 2047: pass
+motor 1000 → motor: 0: pass
+motor frame   thr   fps      n          erpm   T      V   I   ST |   thr  bad  txf late  gap @stat | result
+ 1001    48     0  3999   8002     1961/1961  27  16500   0    0 |    48    0    0    0  260   571 | pass
+ 1250   546   498  4000   8003   11942/11942  42  16000   4    4 |   546    0    0    0  287   611 | pass
+ 1500  1046   998  4000   8003   21929/21929  56  15250   9    7 |  1046    0    0    0  261   553 | pass
+ 1750  1546  1498  4000   8003   31982/31982  70  14500  14   75 |  1546    0    0    0  261   263 | pass
+ 2000  2047  1999  4000   8003   42016/42016  84  14000  20  206 |  2047    0    0    0  262   450 | pass
+ 1000     0  stop  3999   8002           0/0  25  16750   0    0 |     0    0    0    0  263   532 | pass
+sweep: PASS

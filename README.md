@@ -55,7 +55,8 @@ Connect these pins:
 GPIO0 has the internal pull-up enabled; the line idles high.
 
 The received frames are decoded with `dshot-codec` and reported as text over the USB connection
-using a CDC+ACM profile, twice a second:
+using a CDC+ACM profile, twice a second, while a terminal holds the port open (nothing is queued while it is
+closed, so the first line after opening is a fresh one):
 
 ```
 7D05 thr=1000 T=0 cmd=0 n=12345 bad=0 txf=0 late=0 gap=251 edt=0

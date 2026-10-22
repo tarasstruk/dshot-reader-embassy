@@ -1,0 +1,68 @@
+   0.000 --- FC /dev/ttyACM1, ESC /dev/ttyACM0
+   0.001 >>  stat
+   0.002 FC  fc thr=stop hz=4000 fps=3999 n=2235022 ok=2229122 to=5900 gcr=0 crc=0 busy=0 erpm=0/0 per=2159400 T=25 V=16750 I=0 ST=0 D1=0 D2=0 edt=11610,11610,11610,11609,11609,11610 ack=0
+   0.509 ESC 001E thr=0 T=1 cmd=1 n=214776 bad=0 txf=0 late=0 gap=263 edt=1
+   1.009 ESC 001E thr=0 T=1 cmd=1 n=216777 bad=0 txf=0 late=0 gap=326 edt=1
+   1.203 >>  motor 1001
+   1.203 FC  motor: 48
+   1.510 ESC 0618 thr=48 T=1 cmd=0 n=218778 bad=0 txf=0 late=0 gap=286 edt=1
+   2.010 ESC 0618 thr=48 T=1 cmd=0 n=220779 bad=0 txf=0 late=0 gap=264 edt=1
+   2.510 ESC 0618 thr=48 T=1 cmd=0 n=222780 bad=0 txf=0 late=0 gap=262 edt=1
+   3.010 ESC 0618 thr=48 T=1 cmd=0 n=224780 bad=0 txf=0 late=0 gap=260 edt=1
+   3.203 >>  stat
+   3.204 FC  fc thr=0 hz=4000 fps=3999 n=8002 ok=8002 to=0 gcr=0 crc=0 busy=0 erpm=1961/1961 per=7690 T=27 V=16500 I=0 ST=0 D1=0 D2=0 edt=41,41,42,42,41,41 ack=0
+   3.510 ESC 0618 thr=48 T=1 cmd=0 n=226781 bad=0 txf=0 late=0 gap=571 edt=1
+   3.804 >>  motor 1250
+   3.805 FC  motor: 546
+   4.010 ESC 445A thr=546 T=1 cmd=0 n=228782 bad=0 txf=0 late=0 gap=421 edt=1
+   4.511 ESC 445A thr=546 T=1 cmd=0 n=230783 bad=0 txf=0 late=0 gap=262 edt=1
+   5.011 ESC 445A thr=546 T=1 cmd=0 n=232783 bad=0 txf=0 late=0 gap=261 edt=1
+   5.511 ESC 445A thr=546 T=1 cmd=0 n=234784 bad=0 txf=0 late=0 gap=287 edt=1
+   5.805 >>  stat
+   5.806 FC  fc thr=498 hz=4000 fps=4000 n=8003 ok=8003 to=0 gcr=0 crc=0 busy=0 erpm=11942/11942 per=7691 T=42 V=16000 I=4 ST=4 D1=0 D2=0 edt=41,41,41,42,42,41 ack=0
+   6.011 ESC 445A thr=546 T=1 cmd=0 n=236785 bad=0 txf=0 late=0 gap=611 edt=1
+   6.406 >>  motor 1500
+   6.407 FC  motor: 1046
+   6.511 ESC 82D8 thr=1046 T=1 cmd=0 n=238785 bad=0 txf=0 late=0 gap=345 edt=1
+   7.012 ESC 82D8 thr=1046 T=1 cmd=0 n=240786 bad=0 txf=0 late=0 gap=293 edt=1
+   7.512 ESC 82D8 thr=1046 T=1 cmd=0 n=242787 bad=0 txf=0 late=0 gap=297 edt=1
+   8.012 ESC 82D8 thr=1046 T=1 cmd=0 n=244788 bad=0 txf=0 late=0 gap=261 edt=1
+   8.407 >>  stat
+   8.408 FC  fc thr=998 hz=4000 fps=4000 n=8003 ok=8003 to=0 gcr=0 crc=0 busy=0 erpm=21929/21929 per=7691 T=56 V=15250 I=9 ST=7 D1=0 D2=0 edt=41,41,41,41,42,42 ack=0
+   8.512 ESC 82D8 thr=1046 T=1 cmd=0 n=246788 bad=0 txf=0 late=0 gap=553 edt=1
+   9.008 >>  motor 1750
+   9.008 FC  motor: 1546
+   9.012 ESC C157 thr=1546 T=1 cmd=0 n=248789 bad=0 txf=0 late=0 gap=288 edt=1
+   9.512 ESC C157 thr=1546 T=1 cmd=0 n=250790 bad=0 txf=0 late=0 gap=260 edt=1
+  10.012 ESC C157 thr=1546 T=1 cmd=0 n=252791 bad=0 txf=0 late=0 gap=263 edt=1
+  10.513 ESC C157 thr=1546 T=1 cmd=0 n=254791 bad=0 txf=0 late=0 gap=261 edt=1
+  11.009 >>  stat
+  11.009 FC  fc thr=1498 hz=4000 fps=4000 n=8003 ok=8003 to=0 gcr=0 crc=0 busy=0 erpm=31982/31982 per=7691 T=70 V=14500 I=14 ST=75 D1=0 D2=0 edt=42,42,41,41,41,41 ack=0
+  11.013 ESC C157 thr=1546 T=1 cmd=0 n=256792 bad=0 txf=0 late=0 gap=609 edt=1
+  11.513 ESC C157 thr=1546 T=1 cmd=0 n=258793 bad=0 txf=0 late=0 gap=263 edt=1
+  11.609 >>  motor 2000
+  11.610 FC  motor: 2047
+  12.013 ESC FFF0 thr=2047 T=1 cmd=0 n=260793 bad=0 txf=0 late=0 gap=310 edt=1
+  12.513 ESC FFF0 thr=2047 T=1 cmd=0 n=262794 bad=0 txf=0 late=0 gap=278 edt=1
+  13.014 ESC FFF0 thr=2047 T=1 cmd=0 n=264795 bad=0 txf=0 late=0 gap=264 edt=1
+  13.514 ESC FFF0 thr=2047 T=1 cmd=0 n=266795 bad=0 txf=0 late=0 gap=262 edt=1
+  13.610 >>  stat
+  13.611 FC  fc thr=1999 hz=4000 fps=4000 n=8003 ok=8003 to=0 gcr=0 crc=0 busy=0 erpm=42016/42016 per=7691 T=84 V=14000 I=20 ST=206 D1=0 D2=0 edt=41,42,42,41,41,41 ack=0
+  14.014 ESC FFF0 thr=2047 T=1 cmd=0 n=268796 bad=0 txf=0 late=0 gap=450 edt=1
+  14.211 >>  motor 1000
+  14.212 FC  motor: 0
+  14.514 ESC 001E thr=0 T=1 cmd=1 n=270797 bad=0 txf=0 late=0 gap=401 edt=1
+  15.014 ESC 001E thr=0 T=1 cmd=1 n=272797 bad=0 txf=0 late=0 gap=260 edt=1
+  15.514 ESC 001E thr=0 T=1 cmd=1 n=274798 bad=0 txf=0 late=0 gap=288 edt=1
+  16.014 ESC 001E thr=0 T=1 cmd=1 n=276799 bad=0 txf=0 late=0 gap=263 edt=1
+  16.212 >>  stat
+  16.212 FC  fc thr=stop hz=4000 fps=3999 n=8002 ok=8002 to=0 gcr=0 crc=0 busy=0 erpm=0/0 per=7690 T=25 V=16750 I=0 ST=0 D1=0 D2=0 edt=41,41,42,42,41,41 ack=0
+  16.515 ESC 001E thr=0 T=1 cmd=1 n=278799 bad=0 txf=0 late=0 gap=532 edt=1
+  16.813 --- motor frame   thr   fps      n          erpm   T      V   I   ST |   thr  bad  txf late  gap @stat | result
+  16.813 ---  1001    48     0  3999   8002     1961/1961  27  16500   0    0 |    48    0    0    0  260   571 | pass
+  16.813 ---  1250   546   498  4000   8003   11942/11942  42  16000   4    4 |   546    0    0    0  287   611 | pass
+  16.813 ---  1500  1046   998  4000   8003   21929/21929  56  15250   9    7 |  1046    0    0    0  261   553 | pass
+  16.813 ---  1750  1546  1498  4000   8003   31982/31982  70  14500  14   75 |  1546    0    0    0  261   263 | pass
+  16.813 ---  2000  2047  1999  4000   8003   42016/42016  84  14000  20  206 |  2047    0    0    0  262   450 | pass
+  16.813 ---  1000     0  stop  3999   8002           0/0  25  16750   0    0 |     0    0    0    0  263   532 | pass
+  16.813 --- sweep: PASS

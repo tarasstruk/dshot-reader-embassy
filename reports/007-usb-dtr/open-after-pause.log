@@ -1,0 +1,7 @@
+opened /dev/ttyACM0
+ 0.509  001E thr=0 T=1 cmd=1 n=174780 bad=0 txf=0 late=0 gap=262 edt=1
+ 1.009  001E thr=0 T=1 cmd=1 n=176781 bad=0 txf=0 late=0 gap=388 edt=1
+ 1.509  001E thr=0 T=1 cmd=1 n=178782 bad=0 txf=0 late=0 gap=311 edt=1
+ 2.010  001E thr=0 T=1 cmd=1 n=180783 bad=0 txf=0 late=0 gap=263 edt=1
+ 2.510  001E thr=0 T=1 cmd=1 n=182783 bad=0 txf=0 late=0 gap=262 edt=1
+ 3.010  001E thr=0 T=1 cmd=1 n=184784 bad=0 txf=0 late=0 gap=319 edt=1

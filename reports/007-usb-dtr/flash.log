@@ -1,0 +1,7 @@
+   Compiling dshot-reader-embassy v0.1.0 (/home/taras/learn/dshot-reader-embassy)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.39s
+     Running `probe-rs run --chip RP2040 target/thumbv6m-none-eabi/release/dshot-reader-embassy`
+     [38;5;10m[1mFinished[0m in 1.83s
+[INFO ] dshot-reader-embassy: DShot300 on GPIO0, debug on GPIO3 (dshot_reader_embassy dshot-reader-embassy/src/main.rs:243)
+Received Ctrl+C, exiting
+Exited by user request
