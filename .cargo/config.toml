@@ -10,11 +10,12 @@
 #
 
 [build]
-# Set the default target to match the Cortex-M0+ in the RP2040
-target = "thumbv6m-none-eabi"
+# Set the default target to match the Cortex-M33 cores in the RP2350
+# (`eabihf`: hardware single-precision FPU)
+target = "thumbv8m.main-none-eabihf"
 
 # Target specific options
-[target.thumbv6m-none-eabi]
+[target.thumbv8m.main-none-eabihf]
 # Pass some extra options to rustc, some of which get passed on to the linker.
 #
 # * linker argument --nmagic turns off page alignment of sections (which saves
@@ -23,33 +24,23 @@ target = "thumbv6m-none-eabi"
 #   script. This is usually provided by the cortex-m-rt crate, and by default
 #   the version in that crate will include a file called `memory.x` which
 #   describes the particular memory layout for your specific chip. 
-# * linker argument -Tlink-rp.x places the second stage bootloader (boot2) from
-#   embassy-rp into the BOOT2 region of `memory.x`
 # * linker argument -Tdefmt.x places the defmt log strings (logs go over RTT
 #   to the debug probe)
-# * no-vectorize-loops turns off the loop vectorizer (seeing as the M0+ doesn't
-#   have SIMD)
 rustflags = [
   "-C", "link-arg=--nmagic",
   "-C", "link-arg=-Tlink.x",
-  "-C", "link-arg=-Tlink-rp.x",
   "-C", "link-arg=-Tdefmt.x",
-  "-C", "no-vectorize-loops",
 ]
 
 # This runner will find a supported SWD debug probe (e.g. the Raspberry Pi
-# Debug Probe), flash your RP2040 over SWD and print the defmt logs:
-runner = "probe-rs run --chip RP2040"
-
-# Without a probe: make a UF2 file and copy it to an RP2040 mounted in USB
-# Bootloader mode (BOOTSEL); defmt logs are then not visible:
-# runner = "elf2uf2-rs -d"
+# Debug Probe), flash your RP2350 (Cortex-M33 cores) over SWD and print the defmt logs:
+runner = "probe-rs run --chip RP235x"
 
 [env]
 DEFMT_LOG = "info"
 
 [alias]
-# Host-side tests of the hardware-independent codec (the default build target is the RP2040).
+# Host-side tests of the hardware-independent codec (the default build target is the RP2350).
 test-codec = "test -p dshot-codec --target x86_64-unknown-linux-gnu"
 # Host-side tests of the bench ESC emulation (reply models, EDT scheduling).
 test-esc-emu = "test -p esc-emu --target x86_64-unknown-linux-gnu"
