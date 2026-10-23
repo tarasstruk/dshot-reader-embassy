@@ -56,7 +56,7 @@ probe-rs list                 # is the probe there?
 ```
 
 - **Flashing is only through the probe** (`probe-rs`); no BOOTSEL/UF2 path.
-- With the `test-esc` FC on the bench, two probes are plugged in: flash with `cargo build --release && probe-rs run --chip RP235x --probe 2e8a:000c:E665D0C59B25A52B target/thumbv8m.main-none-eabihf/release/dshot-reader-embassy` (the runner names no probe; see the device table below).
+- With the `test-esc` FC on the bench, two probes are plugged in: the runner names this board's probe (`--probe 2e8a:000c:E665D0C59B25A52B`), so `cargo run --release` flashes only the ESC (device table below).
 - **Always flash the release build.** The debug build delays the PIO task by ≈ 1.7 ms on every USB line (`reports/003-day-three/findings.md`).
 - Library clippy for tests: `cargo clippy -p esc-emu --target x86_64-unknown-linux-gnu --tests` (same for `dshot-codec`).
 - Linker args (`-Tlink.x -Tdefmt.x`) live in `.cargo/config.toml`. The RP2350 boot ROM needs the IMAGE_DEF block in the first 4 KiB of flash; embassy-rp provides it (`.start_block`, placed by `memory.x`).

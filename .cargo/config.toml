@@ -32,9 +32,10 @@ rustflags = [
   "-C", "link-arg=-Tdefmt.x",
 ]
 
-# This runner will find a supported SWD debug probe (e.g. the Raspberry Pi
-# Debug Probe), flash your RP2350 (Cortex-M33 cores) over SWD and print the defmt logs:
-runner = "probe-rs run --chip RP235x"
+# Flashes the RP2350 (Cortex-M33 cores) over SWD and prints the defmt logs until Ctrl-C.
+# `--probe` names this board's own Debug Probe (serial E665D0C59B25A52B): the bench has a
+# second one on the test-esc FC, which must not get this firmware.
+runner = "probe-rs run --chip RP235x --probe 2e8a:000c:E665D0C59B25A52B"
 
 [env]
 DEFMT_LOG = "info"

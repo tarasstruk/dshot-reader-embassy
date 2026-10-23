@@ -38,12 +38,9 @@ cargo run --release
 the telemetry text still goes over USB (see below). Check that the probe is seen with
 `probe-rs list`.
 
-On the bench with the [test-esc](../test-esc) FC two probes are plugged in, so name the probe:
-
-```shell
-cargo build --release
-probe-rs run --chip RP235x --probe 2e8a:000c:E665D0C59B25A52B target/thumbv8m.main-none-eabihf/release/dshot-reader-embassy
-```
+On the bench with the [test-esc](../test-esc) FC two probes are plugged in; the runner names this
+board's probe (`--probe` in `.cargo/config.toml`), so `cargo run --release` never flashes the FC.
+With another probe, change its serial there.
 
 | Board | Debug probe | `probe-rs` argument | Probe UART (`ID_SERIAL_SHORT`) | Board USB (VID:PID) |
 |---|---|---|---|---|
