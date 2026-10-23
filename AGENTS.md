@@ -56,6 +56,7 @@ probe-rs list                 # is the probe there?
 ```
 
 - **Flashing is only through the probe** (`probe-rs`); no BOOTSEL/UF2 path.
+- With the `test-esc` FC on the bench, two probes are plugged in: flash with `cargo build --release && probe-rs run --chip RP235x --probe 2e8a:000c:E665D0C59B25A52B target/thumbv8m.main-none-eabihf/release/dshot-reader-embassy` (the runner names no probe; see the device table below).
 - **Always flash the release build.** The debug build delays the PIO task by ≈ 1.7 ms on every USB line (`reports/003-day-three/findings.md`).
 - Library clippy for tests: `cargo clippy -p esc-emu --target x86_64-unknown-linux-gnu --tests` (same for `dshot-codec`).
 - Linker args (`-Tlink.x -Tdefmt.x`) live in `.cargo/config.toml`. The RP2350 boot ROM needs the IMAGE_DEF block in the first 4 KiB of flash; embassy-rp provides it (`.start_block`, placed by `memory.x`).
@@ -68,7 +69,8 @@ Before handing over a code change: release build, clippy, `cargo fmt --check`, b
 |---|---|
 | FC (Betaflight, AT32F435) | `/dev/ttyACM*` with `ID_VENDOR_ID=2e3c` |
 | RP2350 (this firmware) | `/dev/ttyACM*` with `ID_VENDOR_ID=c0de` |
-| Debug probe UART | `/dev/ttyACM*` with `ID_VENDOR_ID=2e8a` |
+| Debug probe of this board (ESC) | `probe-rs … --probe 2e8a:000c:E665D0C59B25A52B`; its UART: `/dev/ttyACM*` with `ID_VENDOR_ID=2e8a`, `ID_SERIAL_SHORT=E665D0C59B25A52B` |
+| Debug probe of the `test-esc` FC | `probe-rs … --probe 2e8a:000c:E66480454F2FB036`; its UART: `ID_SERIAL_SHORT=E66480454F2FB036` — do not flash this firmware through it |
 
 Find ports by VID (`udevadm info -q property -n /dev/ttyACMx | grep ID_VENDOR_ID`); the numbers change after every FC reboot.
 

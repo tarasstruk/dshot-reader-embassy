@@ -38,6 +38,18 @@ cargo run --release
 the telemetry text still goes over USB (see below). Check that the probe is seen with
 `probe-rs list`.
 
+On the bench with the [test-esc](../test-esc) FC two probes are plugged in, so name the probe:
+
+```shell
+cargo build --release
+probe-rs run --chip RP235x --probe 2e8a:000c:E665D0C59B25A52B target/thumbv8m.main-none-eabihf/release/dshot-reader-embassy
+```
+
+| Board | Debug probe | `probe-rs` argument | Probe UART (`ID_SERIAL_SHORT`) | Board USB (VID:PID) |
+|---|---|---|---|---|
+| FC (`test-esc`) | Raspberry Pi Debug Probe | `--probe 2e8a:000c:E66480454F2FB036` | `E66480454F2FB036` | `c0de:cafd` |
+| ESC (`dshot-reader-embassy`) | Raspberry Pi Debug Probe | `--probe 2e8a:000c:E665D0C59B25A52B` | `E665D0C59B25A52B` | `c0de:cafe` |
+
 Always flash the release build: with the debug build, formatting the USB line delays
 the PIO task by ≈ 1.7 ms (see `reports/003-day-three/findings.md`).
 
