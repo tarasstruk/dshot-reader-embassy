@@ -18,7 +18,8 @@ voltage, current, status and two debug values (see `docs/edt.md`).
 
 ### Hardware
 
-The binary is tested on RP2040 microcontroller board.
+The binary runs on the RP2350 (Raspberry Pi Pico 2, Cortex-M33 cores, target
+`thumbv8m.main-none-eabihf`). The RP2040 version is on the `with-probe-rs` branch.
 
 A source of DShot signal with level `3.3V` is required. 
 It can be any ordinary Flight Controller or the [dshot-writer-test](https://github.com/tarasstruk/dshot-writer-test).
@@ -32,7 +33,7 @@ and [probe-rs](https://probe.rs/), as in `gabriele-embassy`:
 cargo run --release
 ```
 
-`probe-rs run --chip RP2040` flashes the RP2040, resets it and then prints the
+`probe-rs run --chip RP235x` flashes the RP2350, resets it and then prints the
 [defmt](https://defmt.ferrous-systems.com/) logs (over RTT) until stopped with Ctrl-C;
 the telemetry text still goes over USB (see below). Check that the probe is seen with
 `probe-rs list`.
@@ -40,17 +41,13 @@ the telemetry text still goes over USB (see below). Check that the probe is seen
 Always flash the release build: with the debug build, formatting the USB line delays
 the PIO task by ≈ 1.7 ms (see `reports/003-day-three/findings.md`).
 
-Without a probe, put the RP2040 into BOOTSEL mode (it shows up as USB mass storage)
-and switch the runner in `.cargo/config.toml` to `elf2uf2-rs -d`; defmt logs are then
-not visible.
-
 ### Connection
 
 Connect these pins:
 
-- RP2040 signal ground;
-- RP2040 GPIO0 to the DShot signal line (it is both read and driven: the reply goes back to the FC);
-- RP2040 GPIO3 can be watched as debug output.
+- Pico 2 signal ground (e.g. physical pin 3);
+- Pico 2 GPIO0 (physical pin 1) to the DShot signal line (it is both read and driven: the reply goes back to the FC);
+- Pico 2 GPIO3 (physical pin 5) can be watched as debug output.
 
 GPIO0 has the internal pull-up enabled; the line idles high.
 
@@ -89,7 +86,7 @@ tio /dev/tty.usbmodem123456781
 The hardware-independent parts are tested on the host:
 
 - `dshot-codec` — encoding of frames, replies and EDT values;
-- `esc-emu` — the bench ESC emulation: what the RP2040 answers to each frame
+- `esc-emu` — the bench ESC emulation: what the RP2350 answers to each frame
   (eRPM and EDT models, EDT schedule); the firmware only moves values between the PIO and it.
 
 ```shell
@@ -106,4 +103,4 @@ and a 21-bit reply of 2.667 µs per bit (≈ 56 µs). For 30 000 eRPM (`e12 = 0x
 Debug output on GPIO3 (PIO side-set):
 
 - a ~170 ns pulse around each sampled bit of a frame (about 1.67 µs after the falling edge of the bit);
-- high for the whole time the RP2040 drives GPIO0, i.e. while the reply is being sent (≈ 56 µs).
+- high for the whole time the RP2350 drives GPIO0, i.e. while the reply is being sent (≈ 56 µs).
