@@ -28,6 +28,7 @@ use fixed::types::extra::U8;
 
 /// PIO state machine clock: 12 MHz gives whole numbers of ticks for both
 /// the command bit (3.333 µs = 40 ticks) and the reply bit (2.667 µs = 32 ticks).
+/// From the RP2350's default 150 MHz clk_sys the divider is exactly 12.5 (0xC80 in 16.8).
 const PIO_CLOCK_HZ: u32 = 12_000_000;
 
 /// Send EDT from the start, without waiting for DShot command 13. Betaflight sends
@@ -240,7 +241,7 @@ async fn pio_task_sm0(mut sm: StateMachine<'static, PIO0, 0>) -> ! {
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
-    defmt::info!("dshot-reader-embassy: DShot300 on GPIO0, debug on GPIO3");
+    defmt::info!("dshot-reader-embassy (RP2350): DShot300 on GPIO0, debug on GPIO3");
 
     // Instantiate the USB driver
     let driver = Driver::new(p.USB, Irqs);
